@@ -207,8 +207,10 @@ dd {
 }
 
 p {
-	margin-top: 1.375em;
-	margin-bottom: 0;
+  width: 400px;
+  white-space: wrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 p + p {
