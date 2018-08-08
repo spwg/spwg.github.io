@@ -1,14 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
+  <title>Spencer Greene</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="css/chessboard-0.3.0.css" rel="stylesheet" type="text/css">
+  <meta name="description" content="Chess AI by Spencer Greene">
+  <style>
+    p {
+      font-size: 16px;
+      font-family: "Courier New", Times, serif;
+    }
+    h1 {
+      font-family: "Courier New", Times, serif;
+    }
+  </style>
 </head>
 <body>
 <h1>
-    Chess
+    Chess AI
 </h1>
 <div id="board1" style="width: 400px"></div>
 <p>Status: <span id="status"></span></p>
 <p>FEN: <span id="fen"></span></p>
 <p>PGN: <span id="pgn"></span></p>
+<p>(Drag and drop of pieces doesn't work on mobile, sorry about that.)</p>
 <script
   src="https://code.jquery.com/jquery-3.3.1.min.js"
   integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
