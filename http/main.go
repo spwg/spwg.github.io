@@ -2,9 +2,9 @@
 package main
 
 import (
+	"io"
 	"log"
 	"os"
-	"io"
 
 	"github.com/gin-gonic/gin"
 )
