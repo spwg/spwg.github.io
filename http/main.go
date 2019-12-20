@@ -13,8 +13,10 @@ import (
 )
 
 func setupLogs() error {
-	if err := os.Mkdir("./logs", 0777); err != nil {
-		return err
+	if _, err := os.Stat("./logs"); os.IsNotExist(err) {
+		if err := os.Mkdir("./logs", 0777); err != nil {
+			return err
+		}
 	}
 	now := time.Now().UTC()
 	serverLog, err := os.Create(fmt.Sprintf("./logs/gin %s.log", now.Format(time.RFC822)))
