@@ -19,8 +19,8 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	gin.DefaultWriter = io.MultiWriter(serverLog, os.Stdout)
-	gin.DefaultErrorWriter = io.MultiWriter(errorLog, os.Stderr)
+	gin.DefaultWriter = io.MultiWriter(serverLog)
+	gin.DefaultErrorWriter = io.MultiWriter(errorLog)
 	r := gin.Default()
 	r.Static("/", "./site")
 	r.LoadHTMLFiles("./templates/404.tmpl")
