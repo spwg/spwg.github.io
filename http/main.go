@@ -44,6 +44,12 @@ func main() {
 			"path": c.Param("filepath"),
 		})
 	})
+	if gin.IsDebugging() {
+		if err := r.Run(); err != nil {
+			log.Fatalln(err)
+		}
+		return
+	}
 	if err := r.RunTLS(
 		":8080",
 		"/etc/letsencrypt/live/spencerwgreene.com/fullchain.pem",
