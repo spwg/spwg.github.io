@@ -45,9 +45,9 @@ func main() {
 		})
 	})
 	if err := r.RunTLS(
-		"8080",
-		"/etc/letsencrypt/csr/0001_csr-certbot.pem",
-		"/etc/letsencrypt/keys/0001_key-certbot.pem"); err != nil {
+		":8080",
+		"/etc/letsencrypt/live/spencerwgreene.com/fullchain.pem",
+		"/etc/letsencrypt/live/spencerwgreene.com/privkey.pem"); err != nil {
 		log.Fatalln(err)
 	}
 }
