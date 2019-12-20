@@ -10,11 +10,16 @@ import (
 )
 
 func main() {
-	f, err := os.Create("server.log")
+	serverLog, err := os.Create("server.log")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	gin.DefaultWriter = io.MultiWriter(f)
+	errorLog, err := os.Create("error.log")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	gin.DefaultWriter = io.MultiWriter(serverLog, os.Stdout)
+	gin.DefaultErrorWriter = io.MultiWriter(errorLog, os.Stderr)
 	r := gin.Default()
 	r.Static("/", "./site")
 	if err := r.Run(); err != nil {
