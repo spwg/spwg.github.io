@@ -4,6 +4,7 @@ package main
 import (
 	"io"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,12 @@ func main() {
 	gin.DefaultErrorWriter = io.MultiWriter(errorLog, os.Stderr)
 	r := gin.Default()
 	r.Static("/", "./site")
+	r.LoadHTMLFiles("./templates/404.tmpl")
+	r.NoRoute(func(c *gin.Context) {
+		c.HTML(http.StatusNotFound, "404.tmpl", gin.H{
+			"path": c.Param("filepath"),
+		})
+	})
 	if err := r.Run(); err != nil {
 		log.Fatalln(err)
 	}
