@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/gin-gonic/autotls"
 	"github.com/gin-gonic/gin"
 )
 
@@ -44,7 +45,7 @@ func main() {
 			"path": c.Param("filepath"),
 		})
 	})
-	if err := r.Run(); err != nil {
+	if err := autotls.Run(r, "spencerwgreene.com"); err != nil {
 		log.Fatalln(err)
 	}
 }
