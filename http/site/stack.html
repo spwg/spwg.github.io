@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>2019 Reading List</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="How This Website Is Made (Technology Stack)">
+    <style>
+      body {
+        font-family: arial, verdana, sans-serif;
+        width: 95%;
+        margin: auto;
+      }
+      table, th, td {
+        border: 0px;
+      }
+      td {
+        height: 48px;
+      }
+      .container {
+        padding-bottom: 50px;
+      }
+    </style>
+    <link rel="preconnect" href="https://stats.g.doubleclick.net">
+    <link rel="preconnect" href="https://www.google.com">
+    <script>
+      window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+      ga('create', 'UA-124058257-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+    <script async src='analytics.js'></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>How This Website Is Made</h1>
+      <h2>The Stack</h2>
+      <ol>
+          <li><a href="https://golang.org/">Golang</a>, a programming language</li>
+          <li><a href="https://github.com/gin-gonic/gin">Gin</a>, a HTTP framework</li>
+          <li><a href="https://cloudflare.com/">Cloudflare</a>, a content delivery network (CDN)</li>
+          <li><a href="https://certbot.eff.org/">Certbot</a></li>
+          <li><a href="https://www.debian.org/">Debian</a> GNU/Linux 9 (stretch)</li>
+          <li><a href="https://cloud.google.com/">Google Cloud Platform</a> (GCP) f1-micro (1 vCPU, 0.6 GB memory), one instance</li>
+      </ol>
+      <h2>Why?</h2>
+      <p>
+          I like using Go because it's reliable, simple, and efficient. It makes using such a tiny
+          instance from the Google Cloud free tier more reasonable.
+
+          Gin is a highly efficient web framework with 34k stars on Github. I've used it in a few personal
+          projects before and been very pleased by its feature set.
+
+          Cloudflare enables faster page load times because that's just what a CDN is engineered to do. This way,
+          fewer requests need to hit the origin server on Google Cloud, which makes it more unlikely that the computational
+          resource limits on the GCP free tier are exceeded. Also, I turn on full SSL/TLS from Cloudflare to my origin server,
+          which brings me to Certbot.
+
+          Certbot is open source software that gives people free HTTPS certificates using Let's Encrypt. This enables
+          the lock in the URL bar of browsers instead of a Not Secure message.
+
+          Debian is a flavor of Linux that seems to just work. I think it was the default on the list from GCP when I created
+          the server, and the Brown CS department uses it.
+
+          Google Cloud's dashboard UI is simpler and easier to use than Amazon Web Services's (AWS), which I've used before also.
+          (Also, I interned at Google.)
+      </p>
+      <h2>Why not?</h2>
+      <p>
+          I am not using Apache, Nginx, or another standard high-powered web server. This site got 5,195 requests in the last
+          November 19, 2019 - December 19, 2019 using 8.74 MB of bandwidth. 2.7 MB of that was cached by Cloudflare. So,
+          it's not worth the hassle of setting up and maintaining Apache for pretty light traffic. Most requests are automated
+          bots like the Google Crawler or people fishing for misconfigured Wordpress sites.
+      </p>
+    </div>
+  </body>
+</html>
