@@ -28,5 +28,5 @@ if __name__ == "__main__":
         #     "time": str(time), "status": status, "latency_ns": latency_ns, "ip": ip, "method": method, "route": route,
         # }))
         fmt_str = "%d/%b/%Y:%H:%M:%S %z"
-        print(ip, "-", "-", f"[{time.strftime(fmt_str)}]", f"\"{method} {route}\"", status, "-")
+        print(ip, "-", "-", "[" + time.strftime(fmt_str) + "]", "\"" + method + " " + route + "\"", status, "-")
 
