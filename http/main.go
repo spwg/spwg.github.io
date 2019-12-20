@@ -2,25 +2,38 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-func main() {
-	serverLog, err := os.Create("server.log")
-	if err != nil {
-		log.Fatalln(err)
+func setupLogs() error {
+	if err := os.Mkdir("./logs", 0777); err != nil {
+		return err
 	}
-	errorLog, err := os.Create("error.log")
+	now := time.Now().UTC()
+	serverLog, err := os.Create(fmt.Sprintf("./logs/gin %s.log", now.Format(time.RFC822)))
 	if err != nil {
-		log.Fatalln(err)
+		return err
+	}
+	errorLog, err := os.Create(fmt.Sprintf("./logs/error %s.log", now.Format(time.RFC822)))
+	if err != nil {
+		return err
 	}
 	gin.DefaultWriter = io.MultiWriter(serverLog)
 	gin.DefaultErrorWriter = io.MultiWriter(errorLog)
+	return nil
+}
+
+func main() {
+	if err := setupLogs(); err != nil {
+		log.Fatalln(err)
+	}
 	r := gin.Default()
 	r.Static("/", "./site")
 	r.LoadHTMLFiles("./templates/404.tmpl")
