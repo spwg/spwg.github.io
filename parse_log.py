@@ -11,7 +11,7 @@ if __name__ == "__main__":
     lines = [[x.strip() for x in line.split('|')] for line in lines if len(line) > 5 and line[:5] == "[GIN]"]
     for line in lines:
         time = datetime.datetime.strptime(line[0], "[GIN] %Y/%m/%d - %H:%M:%S")
-        time = time.astimezone(datetime.timezone(datetime.timedelta(0)))
+        time = time.replace(tzinfo=datetime.timezone(datetime.timedelta(0)))
         status = int(line[1])
         if line[2][-2:] == "µs":
             latency_ns = float(line[2][:-2])
