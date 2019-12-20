@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/gin-gonic/autotls"
 	"github.com/gin-gonic/gin"
 )
 
@@ -45,7 +44,10 @@ func main() {
 			"path": c.Param("filepath"),
 		})
 	})
-	if err := autotls.Run(r, "spencerwgreene.com"); err != nil {
+	if err := r.RunTLS(
+		"8080",
+		"/etc/letsencrypt/csr/0001_csr-certbot.pem",
+		"/etc/letsencrypt/keys/0001_key-certbot.pem"); err != nil {
 		log.Fatalln(err)
 	}
 }
