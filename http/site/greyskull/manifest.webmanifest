@@ -1,0 +1,12 @@
+{
+  "name": "Greyskull LP mobile app",
+  "short_name": "Greyskull",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fff",
+  "description": "Website for Greyskull LP mobile app",
+  "related_applications": [{
+    "platform": "itunes",
+    "url": "https://expo.io/@spwg20/greyskull"
+  }]
+}
