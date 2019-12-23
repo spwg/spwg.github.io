@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 func setupLogs() error {
@@ -32,10 +33,7 @@ func setupLogs() error {
 	return nil
 }
 
-func main() {
-	if err := setupLogs(); err != nil {
-		log.Fatalln(err)
-	}
+func routerSWG() http.Handler {
 	r := gin.Default()
 	r.Static("/", "./site")
 	r.LoadHTMLFiles("./templates/404.tmpl")
@@ -44,16 +42,44 @@ func main() {
 			"path": c.Param("filepath"),
 		})
 	})
-	if gin.IsDebugging() {
-		if err := r.Run(); err != nil {
-			log.Fatalln(err)
-		}
-		return
-	}
-	if err := r.RunTLS(
-		":8080",
-		"/etc/letsencrypt/live/spencerwgreene.com/fullchain.pem",
-		"/etc/letsencrypt/live/spencerwgreene.com/privkey.pem"); err != nil {
+	return r
+}
+
+func routerGreyskull() http.Handler {
+	r := gin.Default()
+	r.Static("/greyskull", "./site/greyskull")
+	return r
+}
+
+func main() {
+	if err := setupLogs(); err != nil {
 		log.Fatalln(err)
+	}
+	var g errgroup.Group
+	swgSrv := &http.Server{
+		Addr:         ":8080",
+		Handler:      routerSWG(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+	greyskullSrv := &http.Server{
+		Addr:         ":8081",
+		Handler:      routerGreyskull(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+	g.Go(func() error {
+		if gin.IsDebugging() {
+			return swgSrv.ListenAndServe()
+		}
+		return swgSrv.ListenAndServeTLS(
+			"/etc/letsencrypt/live/spencerwgreene.com/fullchain.pem",
+			"/etc/letsencrypt/live/spencerwgreene.com/privkey.pem")
+	})
+	g.Go(func() error {
+		return greyskullSrv.ListenAndServe()
+	})
+	if err := g.Wait(); err != nil {
+		log.Fatal(err)
 	}
 }
