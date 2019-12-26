@@ -35,10 +35,11 @@ func setupLogs() error {
 
 func setupMiddleware(r *gin.Engine) {
 	secureMiddleware := secure.New(secure.Options{
-		AllowedHosts: []string{"spencerwgreene.com"},
-		FrameDeny:    true,
-		SSLRedirect:  true,
-		SSLHost:      "localhost:8081",
+		AllowedHosts:  []string{"spencerwgreene.com"},
+		FrameDeny:     true,
+		SSLRedirect:   true,
+		SSLHost:       "localhost:8081",
+		IsDevelopment: !gin.IsDebugging(),
 	})
 	var secureFunc gin.HandlerFunc = func(c *gin.Context) {
 		err := secureMiddleware.Process(c.Writer, c.Request)
