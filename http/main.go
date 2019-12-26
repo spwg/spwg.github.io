@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -27,8 +28,8 @@ func setupLogs() error {
 	if err != nil {
 		return err
 	}
-	os.Stdout = serverLog
-	os.Stderr = errorLog
+	gin.DefaultWriter = io.MultiWriter(serverLog)
+	gin.DefaultErrorWriter = io.MultiWriter(errorLog)
 	return nil
 }
 
