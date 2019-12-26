@@ -25,6 +25,7 @@ func setupLogs() error {
 		return err
 	}
 	gin.DefaultWriter = io.MultiWriter(serverLog)
+	gin.DefaultErrorWriter = gin.DefaultWriter
 	return nil
 }
 
