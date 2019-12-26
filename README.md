@@ -23,3 +23,19 @@ The first line redirects incoming connections for port 443 to port 8080, where t
 is running. Port 443 is the where HTTPS requests come in to the machine, and they need
 to be redirected to the actual server running in port 8080. The server runs in port 8080
 by default.
+```console
+$ sudo iptables --table nat --list
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+REDIRECT   tcp  --  anywhere             anywhere             tcp dpt:https redir ports 8080
+REDIRECT   tcp  --  anywhere             anywhere             tcp dpt:http redir ports 8081
+
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+```

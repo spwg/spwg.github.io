@@ -70,7 +70,11 @@ func main() {
 		}
 		return
 	}
-	go r.Run(":8081")
+	go func() {
+		if err := r.Run(":8081"); err != nil {
+			log.Fatalln(err)
+		}
+	}()
 	if err := r.RunTLS(
 		":8080",
 		"/etc/letsencrypt/live/spencerwgreene.com/fullchain.pem",
