@@ -35,7 +35,7 @@ func setupLogs() error {
 
 func setupMiddleware(r *gin.Engine) {
 	secureMiddleware := secure.New(secure.Options{
-		AllowedHosts: "spencerwgreene.com",
+		AllowedHosts: []string{"spencerwgreene.com"},
 		FrameDeny:    true,
 		SSLRedirect:  true,
 		SSLHost:      "localhost:8081",
