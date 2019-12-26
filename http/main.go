@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -20,12 +19,16 @@ func setupLogs() error {
 		}
 	}
 	now := time.Now().UTC()
+	errorLog, err := os.Create(fmt.Sprintf("./logs/error %s.log", now.Format(time.RFC822)))
+	if err != nil {
+		return err
+	}
 	serverLog, err := os.Create(fmt.Sprintf("./logs/gin %s.log", now.Format(time.RFC822)))
 	if err != nil {
 		return err
 	}
-	gin.DefaultWriter = io.MultiWriter(serverLog)
-	gin.DefaultErrorWriter = gin.DefaultWriter
+	os.Stdout = serverLog
+	os.Stderr = errorLog
 	return nil
 }
 
