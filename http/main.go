@@ -59,6 +59,7 @@ func main() {
 		log.Fatalln(err)
 	}
 	r := gin.Default()
+	setupMiddleware(r)
 	r.Static("/", "./site")
 	r.LoadHTMLFiles("./templates/404.tmpl")
 	r.NoRoute(func(c *gin.Context) {
