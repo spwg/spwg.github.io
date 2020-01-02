@@ -39,7 +39,7 @@ func setupMiddleware(r *gin.Engine) {
 		FrameDeny:     true,
 		SSLRedirect:   true,
 		SSLHost:       "localhost:8081",
-		IsDevelopment: !gin.IsDebugging(),
+		IsDevelopment: gin.IsDebugging(),
 	})
 	var secureFunc gin.HandlerFunc = func(c *gin.Context) {
 		err := secureMiddleware.Process(c.Writer, c.Request)
