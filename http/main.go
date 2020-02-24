@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -51,7 +52,14 @@ func setupMiddleware(r *gin.Engine) {
 			c.Abort()
 		}
 	}
+	var forwardWWW gin.HandlerFunc = func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.Host, "www.") {
+			host := strings.TrimPrefix(c.Request.Host, "www.")
+			c.Redirect(http.StatusTemporaryRedirect, host+c.Request.RequestURI)
+		}
+	}
 	r.Use(secureFunc)
+	r.Use(forwardWWW)
 }
 
 func main() {
