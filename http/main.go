@@ -35,7 +35,7 @@ func setupMiddleware(r *gin.Engine) {
 		AllowedHosts:  []string{"spencerwgreene.com"},
 		FrameDeny:     true,
 		SSLRedirect:   true,
-		SSLHost:       "localhost:8081",
+		SSLHost:       "localhost:8080",
 		IsDevelopment: gin.IsDebugging(),
 	})
 	var secureFunc gin.HandlerFunc = func(c *gin.Context) {
@@ -49,16 +49,14 @@ func setupMiddleware(r *gin.Engine) {
 		}
 	}
 	var forwardWWW gin.HandlerFunc = func(c *gin.Context) {
-		log.Printf("%+v\n", c)
 		if strings.HasPrefix(c.Request.Host, "www.") {
-			host := strings.TrimPrefix(c.Request.Host, "www.")
-			to := host + c.Request.RequestURI
-			log.Printf("forwarding %+v to %v\n", c, to)
-			c.Redirect(http.StatusTemporaryRedirect, to)
+			to := "https://" + strings.TrimPrefix(c.Request.Host, "www.") + c.Request.URL.Path
+			c.Redirect(http.StatusPermanentRedirect, to)
+			c.Abort()
 		}
 	}
-	r.Use(secureFunc)
 	r.Use(forwardWWW)
+	r.Use(secureFunc)
 }
 
 func main() {
