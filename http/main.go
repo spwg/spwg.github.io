@@ -2,35 +2,31 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/unrolled/secure"
 )
 
 func setupLogs() error {
-	if _, err := os.Stat("./logs"); os.IsNotExist(err) {
-		if err := os.Mkdir("./logs", 0777); err != nil {
-			return err
-		}
-	}
-	now := time.Now().UTC()
-	errorLog, err := os.Create(fmt.Sprintf("./logs/error %s.log", now.Format(time.RFC822)))
-	if err != nil {
-		return err
-	}
-	serverLog, err := os.Create(fmt.Sprintf("./logs/gin %s.log", now.Format(time.RFC822)))
-	if err != nil {
-		return err
-	}
-	gin.DefaultWriter = io.MultiWriter(serverLog)
-	gin.DefaultErrorWriter = io.MultiWriter(errorLog)
+	// if _, err := os.Stat("./logs"); os.IsNotExist(err) {
+	// 	if err := os.Mkdir("./logs", 0777); err != nil {
+	// 		return err
+	// 	}
+	// }
+	// now := time.Now().UTC()
+	// errorLog, err := os.Create(fmt.Sprintf("./logs/error %s.log", now.Format(time.RFC822)))
+	// if err != nil {
+	// 	return err
+	// }
+	// serverLog, err := os.Create(fmt.Sprintf("./logs/gin %s.log", now.Format(time.RFC822)))
+	// if err != nil {
+	// 	return err
+	// }
+	// gin.DefaultWriter = io.MultiWriter(serverLog)
+	// gin.DefaultErrorWriter = io.MultiWriter(errorLog)
 	return nil
 }
 
@@ -55,8 +51,8 @@ func setupMiddleware(r *gin.Engine) {
 	var forwardWWW gin.HandlerFunc = func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.Host, "www.") {
 			host := strings.TrimPrefix(c.Request.Host, "www.")
-			to := host+c.Request.RequestURI
-			log.Printf("forwarding %+v to %v", c, to)
+			to := host + c.Request.RequestURI
+			log.Printf("forwarding %+v to %v\n", c, to)
 			c.Redirect(http.StatusTemporaryRedirect, to)
 		}
 	}
