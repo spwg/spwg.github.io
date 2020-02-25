@@ -49,6 +49,7 @@ func setupMiddleware(r *gin.Engine) {
 		}
 	}
 	var forwardWWW gin.HandlerFunc = func(c *gin.Context) {
+		log.Printf("%+v\n", c)
 		if strings.HasPrefix(c.Request.Host, "www.") {
 			host := strings.TrimPrefix(c.Request.Host, "www.")
 			to := host + c.Request.RequestURI
