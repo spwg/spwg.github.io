@@ -55,7 +55,9 @@ func setupMiddleware(r *gin.Engine) {
 	var forwardWWW gin.HandlerFunc = func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.Host, "www.") {
 			host := strings.TrimPrefix(c.Request.Host, "www.")
-			c.Redirect(http.StatusTemporaryRedirect, host+c.Request.RequestURI)
+			to := host+c.Request.RequestURI
+			log.Printf("forwarding %+v to %v", c, to)
+			c.Redirect(http.StatusTemporaryRedirect, to)
 		}
 	}
 	r.Use(secureFunc)
