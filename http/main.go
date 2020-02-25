@@ -2,31 +2,35 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/unrolled/secure"
 )
 
 func setupLogs() error {
-	// if _, err := os.Stat("./logs"); os.IsNotExist(err) {
-	// 	if err := os.Mkdir("./logs", 0777); err != nil {
-	// 		return err
-	// 	}
-	// }
-	// now := time.Now().UTC()
-	// errorLog, err := os.Create(fmt.Sprintf("./logs/error %s.log", now.Format(time.RFC822)))
-	// if err != nil {
-	// 	return err
-	// }
-	// serverLog, err := os.Create(fmt.Sprintf("./logs/gin %s.log", now.Format(time.RFC822)))
-	// if err != nil {
-	// 	return err
-	// }
-	// gin.DefaultWriter = io.MultiWriter(serverLog)
-	// gin.DefaultErrorWriter = io.MultiWriter(errorLog)
+	if _, err := os.Stat("./logs"); os.IsNotExist(err) {
+		if err := os.Mkdir("./logs", 0777); err != nil {
+			return err
+		}
+	}
+	now := time.Now().UTC()
+	errorLog, err := os.Create(fmt.Sprintf("./logs/error %s.log", now.Format(time.RFC822)))
+	if err != nil {
+		return err
+	}
+	serverLog, err := os.Create(fmt.Sprintf("./logs/gin %s.log", now.Format(time.RFC822)))
+	if err != nil {
+		return err
+	}
+	gin.DefaultWriter = io.MultiWriter(serverLog)
+	gin.DefaultErrorWriter = io.MultiWriter(errorLog)
 	return nil
 }
 
@@ -57,6 +61,19 @@ func setupMiddleware(r *gin.Engine) {
 	}
 	r.Use(forwardWWW)
 	r.Use(secureFunc)
+	r.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
+			param.ClientIP,
+			param.TimeStamp.Format(time.RFC1123),
+			param.Method,
+			param.Path,
+			param.Request.Proto,
+			param.StatusCode,
+			param.Latency,
+			param.Request.UserAgent(),
+			param.ErrorMessage,
+		)
+	}))
 }
 
 func main() {
