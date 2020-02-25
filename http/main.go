@@ -62,7 +62,7 @@ func setupMiddleware(r *gin.Engine) {
 	r.Use(forwardWWW)
 	r.Use(secureFunc)
 	r.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
+		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s\" \"%s\" \"%s\"\n",
 			param.ClientIP,
 			param.TimeStamp.Format(time.RFC1123),
 			param.Method,
