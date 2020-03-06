@@ -74,13 +74,14 @@ func setupMiddleware(r *gin.Engine) {
 			param.ErrorMessage,
 		)
 	}))
+	r.Use(gin.Recovery())
 }
 
 func main() {
 	if err := setupLogs(); err != nil {
 		log.Fatalln(err)
 	}
-	r := gin.Default()
+	r := gin.New()
 	setupMiddleware(r)
 	r.Static("/", "./site")
 	r.LoadHTMLFiles("./templates/404.tmpl")
