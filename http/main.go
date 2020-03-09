@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -35,32 +34,8 @@ func setupLogs() error {
 }
 
 func setupMiddleware(r *gin.Engine) {
-	secureMiddleware := secure.New(secure.Options{
-		AllowedHosts:  []string{"spencerwgreene.com"},
-		FrameDeny:     true,
-		SSLRedirect:   true,
-		SSLHost:       "localhost:8080",
-		IsDevelopment: gin.IsDebugging(),
-	})
-	var secureFunc gin.HandlerFunc = func(c *gin.Context) {
-		err := secureMiddleware.Process(c.Writer, c.Request)
-		if err != nil {
-			c.Abort()
-			return
-		}
-		if status := c.Writer.Status(); status > 300 && status < 399 {
-			c.Abort()
-		}
-	}
-	var forwardWWW gin.HandlerFunc = func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.Host, "www.") {
-			to := "https://" + strings.TrimPrefix(c.Request.Host, "www.") + c.Request.URL.Path
-			c.Redirect(http.StatusPermanentRedirect, to)
-			c.Abort()
-		}
-	}
-	r.Use(forwardWWW)
-	r.Use(secureFunc)
+	// Setup logging and recovery first so that the logging happens first
+	// and then recovery happens before any other middleware.
 	r.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s\" \"%s\" \"%s\"\n",
 			param.ClientIP,
@@ -75,6 +50,23 @@ func setupMiddleware(r *gin.Engine) {
 		)
 	}))
 	r.Use(gin.Recovery())
+	secureMiddleware := secure.New(secure.Options{
+		AllowedHosts:  []string{"spencerwgreene.com"},
+		FrameDeny:     true,
+		SSLRedirect:   true,
+		IsDevelopment: gin.IsDebugging(),
+	})
+	var secureFunc gin.HandlerFunc = func(c *gin.Context) {
+		err := secureMiddleware.Process(c.Writer, c.Request)
+		if err != nil {
+			c.Abort()
+			return
+		}
+		if status := c.Writer.Status(); status > 300 && status < 399 {
+			c.Abort()
+		}
+	}
+	r.Use(secureFunc)
 }
 
 func main() {
