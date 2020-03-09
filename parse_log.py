@@ -1,32 +1,24 @@
-import sys, glob, re, datetime, json
+import sys, glob, re, datetime
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Missing directory path")
         exit(1)
-    lines = []
+    last_file, ft = None, None
     for file in glob.glob(sys.argv[1] + '/gin*.log'):
-        with open(file, "r") as f:
-            lines.extend(f.readlines())
-    lines = [[x.strip() for x in line.split('|')] for line in lines if len(line) > 5 and line[:5] == "[GIN]"]
+        s = ' '.join(file.split()[1:])
+        fmt_str = "%d %b %y %H:%M UTC.log"
+        t = datetime.datetime.strptime(s, fmt_str)
+        t = t.replace(tzinfo=datetime.timezone(datetime.timedelta(0)))
+        if last_file is None or t > ft:
+            last_file, ft = file, t
+    assert last_file is not None
+    print("Most recent file is \"%s\"." % last_file)
+    lines = []
+    with open(last_file, "r") as f:
+        lines.extend(f.readlines())
     for line in lines:
-        time = datetime.datetime.strptime(line[0], "[GIN] %Y/%m/%d - %H:%M:%S")
-        time = time.replace(tzinfo=datetime.timezone(datetime.timedelta(0)))
-        status = int(line[1])
-        if line[2][-2:] == "µs":
-            latency_ns = float(line[2][:-2])
-        elif line[2][-2:] == "ms":
-            latency_ns = float(line[2][:-2]) * 1000
-        else:
-            print("unrecognized time format", line[2])
-            exit(1)
-        ip = line[3]
-        spl = line[4].split()
-        method = spl[0]
-        route = spl[1]
-        # print(json.dumps({
-        #     "time": str(time), "status": status, "latency_ns": latency_ns, "ip": ip, "method": method, "route": route,
-        # }))
-        fmt_str = "%d/%b/%Y:%H:%M:%S %z"
-        print(ip, "-", "-", "[" + time.strftime(fmt_str) + "]", "\"" + method + " " + route + "\"", status, "-")
+        line = line.strip()
+        print(line)
+        # TODO: parse the log line into a common log format for 
 
