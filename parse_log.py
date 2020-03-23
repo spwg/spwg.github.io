@@ -2,7 +2,7 @@ import sys, glob, re, datetime
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Missing directory path")
+        print("usage: python3 parse_log.py <logs directory>")
         exit(1)
     last_file, ft = None, None
     for file in glob.glob(sys.argv[1] + '/gin*.log'):
