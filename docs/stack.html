@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>How This Website Is Made</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="How This Website Is Made (Technology Stack)">
+    <style type="text/css">
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        max-width: 435px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>How This Website Is Made</h1>
+      <h2>The Stack</h2>
+      <ol>
+          <li><a href="https://golang.org/">Golang</a>, a programming language</li>
+          <li><a href="https://github.com/gin-gonic/gin">Gin</a>, a HTTP framework</li>
+          <li><a href="https://cloudflare.com/">Cloudflare</a>, a content delivery network (CDN)</li>
+          <li><a href="https://certbot.eff.org/">Certbot</a></li>
+          <li><a href="https://www.debian.org/">Debian</a> GNU/Linux 9 (stretch)</li>
+          <li><a href="https://cloud.google.com/">Google Cloud Platform</a> (GCP) f1-micro (1 vCPU, 0.6 GB memory), one instance</li>
+      </ol>
+      <h2>Why?</h2>
+      <p>
+        I like using Go because it's reliable, simple, and efficient. It makes using such a tiny
+        instance from the Google Cloud free tier more reasonable.
+      </p>
+      <p>
+        Gin is a highly efficient web framework with 34k stars on Github. I've used it in a few personal
+        projects before and been very pleased by its feature set.
+      </p>
+      <p>
+        Cloudflare enables faster page load times because that's just what a CDN is engineered to do. This way,
+        fewer requests need to hit the origin server on Google Cloud, which makes it more unlikely that the computational
+        resource limits on the GCP free tier are exceeded. Also, I turn on full SSL/TLS from Cloudflare to my origin server,
+        which brings me to Certbot.
+      </p>
+      <p>
+        Certbot is open source software that gives people free HTTPS certificates using Let's Encrypt. This enables
+        the lock in the URL bar of browsers instead of a Not Secure message.
+      </p>
+      <p>
+        Debian is a flavor of Linux that seems to just work. I think it was the default on the list from GCP when I created
+        the server, and the Brown CS department uses it.
+      </p>
+        Google Cloud's dashboard UI is simpler and easier to use than Amazon Web Services's (AWS), which I've used before also.
+        (Also, I interned at Google.)
+      </p>
+      <h2>Why not?</h2>
+      <p>
+          I am not using Apache, Nginx, or another standard high-powered web server. This site got 5,195 requests from
+          November 19, 2019 - December 19, 2019 using 8.74 MB of bandwidth. 2.7 MB of that was cached by Cloudflare. So,
+          it's not worth the hassle of setting up and maintaining Apache for pretty light traffic. Most requests are automated
+          bots like the Google Crawler or people fishing for misconfigured Wordpress sites.
+      </p>
+    </div>
+  </body>
+</html>
