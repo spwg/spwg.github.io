@@ -5,23 +5,39 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Books read in 2020">
+    <style>
+      html {
+        max-width: 1024px; /* iPad Pro width */
+        font-family: 'americanTypewriterRegular';
+        background-color: #f2eecb;
+      }
+      /* downloaded from fontsgeek.com */
+      @font-face {
+        font-family: 'americanTypewriterRegular';
+        src: url('/americanTypewriterRegular.ttf');
+      }
+    </style>
   </head>
-  <style>
-    html {
-      max-width: 1024px; /* iPad Pro width */
-      font-family: 'americanTypewriterRegular';
-      background-color: #f2eecb;
-    }
-    /* downloaded from fontsgeek.com */
-    @font-face {
-      font-family: 'americanTypewriterRegular';
-      src: url('americanTypewriterRegular.ttf');
-    }
-  </style>
   <body>
     <h1>2020 Reading List</h1>
-    <ol>
-      <li>The Autobiography of Charles Darwin: 1809-1882</li>
-    </ol>
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Thoughts</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>The Autobiography of Charles Darwin: 1809-1882</td>
+          <td>
+            Good summary and encapsulation of the life of Darwin. Doesn't focus at all on the HMS Beagle
+            voyage, which was surprising. The footnotes are really interesting because they explain how 
+            Darwin's family edited his autobiography to reflect more acceptable views towards religion. 
+            The language and word choices they make are subtle.
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </body>
 </html>
