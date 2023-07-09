@@ -2,7 +2,10 @@
 package main
 
 import (
+	"embed"
+	"io/fs"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -33,6 +36,9 @@ func setupMiddleware(r *gin.Engine) {
 	r.Use(secureFunc)
 }
 
+//go:embed site/*
+var site embed.FS
+
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -40,7 +46,13 @@ func main() {
 	}
 	r := gin.New()
 	setupMiddleware(r)
-	r.Static("/", "./site")
+	site, err := fs.Sub(site, "site")
+	if err != nil {
+		log.Fatal(err)
+	}
+	r.GET("/", func(c *gin.Context) {
+		c.FileFromFS(c.Request.URL.Path, http.FS(site))
+	})
 	gin.SetMode(gin.ReleaseMode)
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalln(err)
