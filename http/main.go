@@ -51,7 +51,7 @@ func setupMiddleware(r *gin.Engine) {
 	}))
 	r.Use(gin.Recovery())
 	secureMiddleware := secure.New(secure.Options{
-		AllowedHosts:  []string{"spencerwgreene.com", "www.spencerwgreene.com"},
+		AllowedHosts:  []string{"spencergreene.com", "www.spencergreene.com"},
 		FrameDeny:     true,
 		SSLRedirect:   true,
 		IsDevelopment: gin.IsDebugging(),
@@ -90,8 +90,8 @@ func main() {
 	}
 	if err := r.RunTLS(
 		":8080",
-		"/etc/letsencrypt/live/spencerwgreene.com/fullchain.pem",
-		"/etc/letsencrypt/live/spencerwgreene.com/privkey.pem"); err != nil {
+		"/etc/letsencrypt/live/spencergreene.com/fullchain.pem",
+		"/etc/letsencrypt/live/spencergreene.com/privkey.pem"); err != nil {
 		log.Fatalln(err)
 	}
 }
