@@ -44,6 +44,10 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	if os.Getenv("FLY_APP_NAME") != "" {
+		log.Printf("Running in the fly.io runtime.")
+		gin.SetMode(gin.ReleaseMode)
+	}
 	r := gin.New()
 	setupMiddleware(r)
 	site, err := fs.Sub(site, "site")
@@ -53,7 +57,6 @@ func main() {
 	r.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(site))
 	})
-	gin.SetMode(gin.ReleaseMode)
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalln(err)
 	}
