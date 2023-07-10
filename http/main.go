@@ -18,7 +18,11 @@ func setupMiddleware(r *gin.Engine) {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	secureMiddleware := secure.New(secure.Options{
-		AllowedHosts:  []string{"spencergreene.com", "www.spencergreene.com"},
+		AllowedHosts: []string{
+			"spencergreene.com",
+			"www.spencergreene.com",
+			"spencergreene.fly.dev",
+		},
 		FrameDeny:     true,
 		SSLRedirect:   true,
 		IsDevelopment: gin.IsDebugging(),
