@@ -3,8 +3,10 @@ package main
 
 import (
 	"embed"
+	"encoding/json"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 
@@ -59,6 +61,27 @@ func main() {
 	}
 	r.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(site))
+	})
+	r.GET("/api/dnschecker/:url", func(c *gin.Context) {
+		// TODO: connect this to a page in site/ that polls this endpoint
+		// for changes.
+		ctx := c.Request.Context()
+		u := c.Params.ByName("url")
+		addrs, err := net.DefaultResolver.LookupHost(ctx, u)
+		if err != nil {
+			c.AbortWithStatus(500)
+			return
+		}
+		b, err := json.Marshal(addrs)
+		if err != nil {
+			log.Print(err)
+			c.AbortWithStatus(500)
+			return
+		}
+		if _, err := c.Writer.Write(b); err != nil {
+			log.Print(err)
+			c.AbortWithStatus(500)
+		}
 	})
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalln(err)
