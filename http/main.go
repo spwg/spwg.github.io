@@ -24,7 +24,6 @@ func setupMiddleware(r *gin.Engine) {
 			"spencergreene.fly.dev",
 		},
 		FrameDeny:     true,
-		SSLRedirect:   true,
 		IsDevelopment: gin.IsDebugging(),
 	})
 	var secureFunc gin.HandlerFunc = func(c *gin.Context) {
