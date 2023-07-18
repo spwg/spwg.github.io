@@ -138,17 +138,16 @@ func main() {
 		Addr:    ":" + port,
 		Handler: engine,
 	}
-	done := make(chan bool, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 		}
-		close(done)
+		os.Exit(0)
 	}()
 	// Wait until Shutdown returns because ListenAndServe returns immediately when it's called.
 	// Shutdown the server when idle. Fly will start it automatically when it receives a request.
-	for range done {
-		time.Sleep(time.Second)
+	for {
+		time.Sleep(time.Minute)
 		// Skip the shutdown if we haven't passed a health check yet so that Fly knows during
 		// deployments that the release is healthy. Otherwise the server would shutdown too fast.
 		healthCheckedMu.Lock()
