@@ -9,12 +9,19 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/unrolled/secure"
 )
 
-func setupMiddleware(r *gin.Engine) {
+//go:embed cloudflare_ipv4.txt
+var cloudflareIPv4Addresses string
+
+//go:embed cloudflare_ipv6.txt
+var cloudflareIPv6Addresses string
+
+func prepare(r *gin.Engine) {
 	// Setup logging and recovery first so that the logging happens first
 	// and then recovery happens before any other middleware.
 	r.Use(gin.Logger())
@@ -29,7 +36,7 @@ func setupMiddleware(r *gin.Engine) {
 		IsDevelopment:     gin.IsDebugging(),
 		HostsProxyHeaders: []string{"X-Forwarded-Host"},
 	})
-	var secureFunc gin.HandlerFunc = func(c *gin.Context) {
+	r.Use(func(c *gin.Context) {
 		err := secureMiddleware.Process(c.Writer, c.Request)
 		if err != nil {
 			c.Abort()
@@ -38,8 +45,8 @@ func setupMiddleware(r *gin.Engine) {
 		if status := c.Writer.Status(); status > 300 && status < 399 {
 			c.Abort()
 		}
-	}
-	r.Use(secureFunc)
+	})
+	r.SetTrustedProxies(append(strings.Fields(cloudflareIPv4Addresses), strings.Fields(cloudflareIPv6Addresses)...))
 }
 
 //go:embed site/*
@@ -54,16 +61,16 @@ func main() {
 		log.Printf("Running in the fly.io runtime.")
 		gin.SetMode(gin.ReleaseMode)
 	}
-	r := gin.New()
-	setupMiddleware(r)
+	engine := gin.New()
+	prepare(engine)
 	site, err := fs.Sub(site, "site")
 	if err != nil {
 		log.Fatal(err)
 	}
-	r.GET("/", func(c *gin.Context) {
+	engine.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(site))
 	})
-	r.GET("/api/dnschecker/:url", func(c *gin.Context) {
+	engine.GET("/api/dnschecker/:url", func(c *gin.Context) {
 		// TODO: connect this to a page in site/ that polls this endpoint
 		// for changes.
 		ctx := c.Request.Context()
@@ -84,7 +91,7 @@ func main() {
 			c.AbortWithStatus(500)
 		}
 	})
-	if err := r.Run(":" + port); err != nil {
+	if err := engine.Run(":" + port); err != nil {
 		log.Fatalln(err)
 	}
 }
