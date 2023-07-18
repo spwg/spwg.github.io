@@ -36,6 +36,12 @@ func (rc *requestCounter) Increment() {
 	rc.count++
 }
 
+func (rc *requestCounter) Decrement() {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.count--
+}
+
 func (rc *requestCounter) Idle() bool {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
@@ -71,6 +77,8 @@ func prepare(r *gin.Engine) *requestCounter {
 	rc := &requestCounter{}
 	r.Use(func(c *gin.Context) {
 		rc.Increment()
+		c.Next()
+		rc.Decrement()
 	})
 	return rc
 }
@@ -129,7 +137,7 @@ func main() {
 			return
 		}
 		for {
-			time.Sleep(time.Minute)
+			time.Sleep(time.Second)
 			if rc.Idle() {
 				log.Println("Connections are idle. Shutting down.")
 				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
