@@ -6,7 +6,6 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log"
 	"net"
@@ -35,7 +34,6 @@ func (rc *requestCounter) Increment() {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 	rc.count++
-	fmt.Println(rc.count)
 }
 
 func (rc *requestCounter) Idle() bool {
