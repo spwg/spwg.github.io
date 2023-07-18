@@ -132,6 +132,8 @@ func main() {
 			time.Sleep(time.Minute)
 			if rc.Idle() {
 				log.Println("Connections are idle. Shutting down.")
+				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
 				if err := srv.Shutdown(ctx); err != nil {
 					log.Fatal(err)
 				}
