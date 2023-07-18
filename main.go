@@ -2,14 +2,19 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/unrolled/secure"
@@ -21,7 +26,25 @@ var cloudflareIPv4Addresses string
 //go:embed cloudflare_ipv6.txt
 var cloudflareIPv6Addresses string
 
-func prepare(r *gin.Engine) {
+type requestCounter struct {
+	count int
+	mu    sync.Mutex
+}
+
+func (rc *requestCounter) Increment() {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.count++
+	fmt.Println(rc.count)
+}
+
+func (rc *requestCounter) Idle() bool {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	return rc.count == 0
+}
+
+func prepare(r *gin.Engine) *requestCounter {
 	// Setup logging and recovery first so that the logging happens first
 	// and then recovery happens before any other middleware.
 	r.Use(gin.Logger())
@@ -47,12 +70,18 @@ func prepare(r *gin.Engine) {
 		}
 	})
 	r.SetTrustedProxies(append(strings.Fields(cloudflareIPv4Addresses), strings.Fields(cloudflareIPv6Addresses)...))
+	rc := &requestCounter{}
+	r.Use(func(c *gin.Context) {
+		rc.Increment()
+	})
+	return rc
 }
 
 //go:embed site/*
 var site embed.FS
 
 func main() {
+	ctx := context.Background()
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -62,7 +91,7 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine := gin.New()
-	prepare(engine)
+	rc := prepare(engine)
 	site, err := fs.Sub(site, "site")
 	if err != nil {
 		log.Fatal(err)
@@ -91,7 +120,31 @@ func main() {
 			c.AbortWithStatus(500)
 		}
 	})
-	if err := engine.Run(":" + port); err != nil {
-		log.Fatalln(err)
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: engine,
 	}
+	shutdown := make(chan bool)
+	go func() {
+		// Shutdown the server when idle. Fly will start it automatically when it receives a request.
+		if gin.IsDebugging() {
+			return
+		}
+		for {
+			time.Sleep(time.Second)
+			if rc.Idle() {
+				log.Println("Connections are idle. Shutting down.")
+				if err := srv.Shutdown(ctx); err != nil {
+					log.Fatal(err)
+				}
+				shutdown <- true
+				return
+			}
+		}
+	}()
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatal(err)
+	}
+	// Wait until Shutdown returns because ListenAndServe returns immediately when it's called.
+	<-shutdown
 }
