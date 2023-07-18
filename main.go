@@ -105,14 +105,6 @@ func main() {
 	engine.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(site))
 	})
-	var healthCheckedMu sync.Mutex
-	var healthChecked bool
-	engine.GET("/up", func(c *gin.Context) {
-		c.Status(200)
-		healthCheckedMu.Lock()
-		healthChecked = true
-		healthCheckedMu.Unlock()
-	})
 	engine.GET("/api/dnschecker/:url", func(c *gin.Context) {
 		// TODO: connect this to a page in site/ that polls this endpoint
 		// for changes.
@@ -147,13 +139,10 @@ func main() {
 	// Wait until Shutdown returns because ListenAndServe returns immediately when it's called.
 	// Shutdown the server when idle. Fly will start it automatically when it receives a request.
 	for {
+		// Wait a minute before shutdown in order to let Fly health check the server first
+		// exiting. This helps with health checks during deployments.
 		time.Sleep(time.Minute)
-		// Skip the shutdown if we haven't passed a health check yet so that Fly knows during
-		// deployments that the release is healthy. Otherwise the server would shutdown too fast.
-		healthCheckedMu.Lock()
-		checked := healthChecked
-		healthCheckedMu.Unlock()
-		if gin.IsDebugging() || !checked {
+		if gin.IsDebugging() {
 			continue
 		}
 		if rc.Idle() {
