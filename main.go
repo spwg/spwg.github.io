@@ -131,7 +131,7 @@ func main() {
 			return
 		}
 		for {
-			time.Sleep(time.Second)
+			time.Sleep(time.Minute)
 			if rc.Idle() {
 				log.Println("Connections are idle. Shutting down.")
 				if err := srv.Shutdown(ctx); err != nil {
