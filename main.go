@@ -25,8 +25,9 @@ func setupMiddleware(r *gin.Engine) {
 			"www.spencergreene.com",
 			"spencergreene.fly.dev",
 		},
-		FrameDeny:     true,
-		IsDevelopment: gin.IsDebugging(),
+		FrameDeny:         true,
+		IsDevelopment:     gin.IsDebugging(),
+		HostsProxyHeaders: []string{"X-Forwarded-Host"},
 	})
 	var secureFunc gin.HandlerFunc = func(c *gin.Context) {
 		err := secureMiddleware.Process(c.Writer, c.Request)
