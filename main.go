@@ -105,6 +105,14 @@ func main() {
 	engine.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(site))
 	})
+	var healthCheckedMu sync.Mutex
+	var healthChecked bool
+	engine.GET("/up", func(c *gin.Context) {
+		c.Status(200)
+		healthCheckedMu.Lock()
+		healthChecked = true
+		healthCheckedMu.Unlock()
+	})
 	engine.GET("/api/dnschecker/:url", func(c *gin.Context) {
 		// TODO: connect this to a page in site/ that polls this endpoint
 		// for changes.
@@ -130,29 +138,33 @@ func main() {
 		Addr:    ":" + port,
 		Handler: engine,
 	}
-	shutdown := make(chan bool)
+	done := make(chan bool, 1)
 	go func() {
-		// Shutdown the server when idle. Fly will start it automatically when it receives a request.
-		if gin.IsDebugging() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+		close(done)
+	}()
+	// Wait until Shutdown returns because ListenAndServe returns immediately when it's called.
+	// Shutdown the server when idle. Fly will start it automatically when it receives a request.
+	for range done {
+		time.Sleep(time.Second)
+		// Skip the shutdown if we haven't passed a health check yet so that Fly knows during
+		// deployments that the release is healthy. Otherwise the server would shutdown too fast.
+		healthCheckedMu.Lock()
+		checked := healthChecked
+		healthCheckedMu.Unlock()
+		if gin.IsDebugging() || !checked {
+			continue
+		}
+		if rc.Idle() {
+			log.Println("Connections are idle. Shutting down.")
+			// The returned cancel function isn't useful because the process is about to die.
+			ctx, _ := context.WithTimeout(ctx, 5*time.Second)
+			if err := srv.Shutdown(ctx); err != nil {
+				log.Fatal(err)
+			}
 			return
 		}
-		for {
-			time.Sleep(time.Second)
-			if rc.Idle() {
-				log.Println("Connections are idle. Shutting down.")
-				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-				defer cancel()
-				if err := srv.Shutdown(ctx); err != nil {
-					log.Fatal(err)
-				}
-				shutdown <- true
-				return
-			}
-		}
-	}()
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatal(err)
 	}
-	// Wait until Shutdown returns because ListenAndServe returns immediately when it's called.
-	<-shutdown
 }
