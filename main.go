@@ -26,26 +26,30 @@ var cloudflareIPv4Addresses string
 var cloudflareIPv6Addresses string
 
 type requestCounter struct {
-	count int
-	mu    sync.Mutex
+	processing int
+	last       time.Time
+	mu         sync.Mutex
 }
 
 func (rc *requestCounter) Increment() {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
-	rc.count++
+	rc.last = time.Now()
+	rc.processing++
 }
 
 func (rc *requestCounter) Decrement() {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
-	rc.count--
+	rc.last = time.Now()
+	rc.processing--
 }
 
+// Idle returns whether the server is idle and can suspend.
 func (rc *requestCounter) Idle() bool {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
-	return rc.count == 0
+	return rc.processing == 0 && time.Since(rc.last) > time.Second
 }
 
 func prepare(r *gin.Engine) *requestCounter {
