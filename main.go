@@ -134,7 +134,6 @@ func main() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 		}
-		os.Exit(0)
 	}()
 	// Wait until Shutdown returns because ListenAndServe returns immediately when it's called.
 	// Shutdown the server when idle. Fly will start it automatically when it receives a request.
