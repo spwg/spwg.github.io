@@ -1,4 +1,17 @@
-// Binary webhttps runs a web server that servers spencerwgreene.com.
+// Binary main runs a web server for my (Spencer Greene's) personal website.
+//
+// It runs on the Fly app platform (fly.io) in 2 regions, San Jose and Atlanta.
+// DNS is on Cloudflare, which also proxies requests through its CDN. There are A and AAAA
+// records that point to the app on Fly. When a request is made for spencergreene.com,
+// DNS resolution talks to the Cloudflare nameservers, which return IP addresses
+// that route to its own CDN. If there's no cache hit, it sends the request to Fly.
+// Fly terminates the TLS connection from Cloudflare and forwards the request to this
+// web server.
+//
+// If necessary, Fly will start the server to respond to the request. That
+// means this binary should start up fast. To suspend again, it exits after a period
+// of idleness, which means processing zero requests. So, most of the time it doesn't
+// consume any CPU or memory because it's not running.
 package main
 
 import (
@@ -115,20 +128,39 @@ func main() {
 		ctx := c.Request.Context()
 		u := c.Params.ByName("url")
 		addrs, err := net.DefaultResolver.LookupHost(ctx, u)
+		var dnsErr *net.DNSError
 		if err != nil {
-			c.AbortWithStatus(500)
+			switch v := err.(type) {
+			case *net.DNSError:
+				dnsErr = v
+			default:
+				log.Print(err)
+				c.AbortWithStatus(500)
+				return
+			}
+		}
+		if len(addrs) > 0 {
+			b, err := json.Marshal(addrs)
+			if err != nil {
+				log.Print(err)
+				c.AbortWithStatus(500)
+				return
+			}
+			b = append([]byte("IP addresses: "), b...)
+			if _, err := c.Writer.Write(b); err != nil {
+				log.Print(err)
+				c.AbortWithStatus(500)
+				return
+			}
+		}
+		if dnsErr != nil {
+			if _, err := c.Writer.WriteString(dnsErr.Error()); err != nil {
+				log.Print(err)
+				c.AbortWithStatus(500)
+			}
 			return
 		}
-		b, err := json.Marshal(addrs)
-		if err != nil {
-			log.Print(err)
-			c.AbortWithStatus(500)
-			return
-		}
-		if _, err := c.Writer.Write(b); err != nil {
-			log.Print(err)
-			c.AbortWithStatus(500)
-		}
+		// TODO: add other lookups (e.g. LookupNS) and factor out handling of DNS errors.
 	})
 	srv := &http.Server{
 		Addr:    ":" + port,
