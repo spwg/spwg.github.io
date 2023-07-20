@@ -129,7 +129,7 @@ func main() {
 	engine.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(site))
 	})
-	engine.GET("/api/dnschecker/:url", func(c *gin.Context) {
+	engine.GET("/dnschecker/:url", func(c *gin.Context) {
 		// TODO: connect this to a page in site/ that polls this endpoint
 		// for changes.
 		ctx := c.Request.Context()
