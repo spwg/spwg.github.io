@@ -32,11 +32,14 @@ import (
 	"github.com/unrolled/secure"
 )
 
-//go:embed cloudflare_ipv4.txt
-var cloudflareIPv4Addresses string
-
-//go:embed cloudflare_ipv6.txt
-var cloudflareIPv6Addresses string
+var (
+	//go:embed cloudflare_ipv4.txt
+	cloudflareIPv4Addresses string
+	//go:embed cloudflare_ipv6.txt
+	cloudflareIPv6Addresses string
+	//go:embed site/*
+	site embed.FS
+)
 
 type requestCounter struct {
 	processing int
@@ -99,9 +102,6 @@ func prepare(r *gin.Engine) *requestCounter {
 	})
 	return rc
 }
-
-//go:embed site/*
-var site embed.FS
 
 func main() {
 	ctx := context.Background()
