@@ -19,6 +19,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"html/template"
 	"io/fs"
 	"log"
 	"net"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/unrolled/secure"
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -103,13 +105,6 @@ func prepare(r *gin.Engine) *requestCounter {
 	return rc
 }
 
-func writeError(err error, c *gin.Context) {
-	if _, err := c.Writer.WriteString(err.Error()); err != nil {
-		log.Print(err)
-		c.AbortWithStatus(500)
-	}
-}
-
 func main() {
 	ctx := context.Background()
 	port := os.Getenv("PORT")
@@ -129,52 +124,65 @@ func main() {
 	engine.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(site))
 	})
+
+	dnsCheckerTemplate, err := template.ParseFS(site, "dnschecker.html.tmpl")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	engine.GET("/dnschecker/:url", func(c *gin.Context) {
 		// TODO: connect this to a page in site/ that polls this endpoint
 		// for changes.
 		ctx := c.Request.Context()
 		u := c.Params.ByName("url")
-		addrs, err := net.DefaultResolver.LookupHost(ctx, u)
-		var dnsErr *net.DNSError
+		lookupHostResponse, err := net.DefaultResolver.LookupHost(ctx, u)
 		if err != nil {
+			log.Print(err)
 			switch err.(type) {
 			case *net.DNSError:
-				writeError(dnsErr, c)
+				c.AbortWithError(404, err)
 			default:
-				log.Print(err)
-				c.AbortWithStatus(500)
-				return
+				c.AbortWithError(500, err)
 			}
+			return
 		}
-		b, err := json.MarshalIndent(addrs, "", "  ")
+		slices.Sort(lookupHostResponse)
+		ipAddrs, err := json.MarshalIndent(lookupHostResponse, "", "  ")
 		if err != nil {
 			log.Print(err)
 			c.AbortWithStatus(500)
 			return
 		}
-		b = append([]byte("IP addresses: "), b...)
-		if _, err := c.Writer.Write(b); err != nil {
-			log.Print(err)
-			c.AbortWithStatus(500)
-			return
-		}
-		nameServers, err := net.DefaultResolver.LookupNS(ctx, u)
+		lookupNSResponse, err := net.DefaultResolver.LookupNS(ctx, u)
 		if err != nil {
+			log.Print(err)
 			switch err.(type) {
 			case *net.DNSError:
-				writeError(err, c)
+				c.AbortWithError(404, err)
 			default:
-				log.Print(err)
+				c.AbortWithError(500, err)
 			}
+			return
 		}
-		b, err = json.MarshalIndent(nameServers, "", "  ")
+		slices.SortFunc(lookupNSResponse, func(a, b *net.NS) bool {
+			return a.Host < b.Host
+		})
+		nameServers, err := json.MarshalIndent(lookupNSResponse, "", "  ")
 		if err != nil {
 			log.Print(err)
 			c.AbortWithStatus(500)
 			return
 		}
-		b = append([]byte("\n\nName servers: "), b...)
-		if _, err := c.Writer.Write(b); err != nil {
+		page := struct {
+			IPAddresses string
+			NameServers string
+			CurrentTime string
+		}{
+			IPAddresses: string(ipAddrs),
+			NameServers: string(nameServers),
+			CurrentTime: time.Now().UTC().Format(time.RFC3339),
+		}
+		if err := dnsCheckerTemplate.Execute(c.Writer, page); err != nil {
 			log.Print(err)
 			c.AbortWithStatus(500)
 			return
