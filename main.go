@@ -146,7 +146,7 @@ func main() {
 				return
 			}
 		}
-		b, err := json.Marshal(addrs)
+		b, err := json.MarshalIndent(addrs, "", "  ")
 		if err != nil {
 			log.Print(err)
 			c.AbortWithStatus(500)
@@ -167,13 +167,13 @@ func main() {
 				log.Print(err)
 			}
 		}
-		b, err = json.Marshal(nameServers)
+		b, err = json.MarshalIndent(nameServers, "", "  ")
 		if err != nil {
 			log.Print(err)
 			c.AbortWithStatus(500)
 			return
 		}
-		b = append([]byte("Name servers: "), b...)
+		b = append([]byte("\n\nName servers: "), b...)
 		if _, err := c.Writer.Write(b); err != nil {
 			log.Print(err)
 			c.AbortWithStatus(500)
