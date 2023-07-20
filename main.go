@@ -131,8 +131,6 @@ func main() {
 	}
 
 	engine.GET("/dnschecker/:url", func(c *gin.Context) {
-		// TODO: connect this to a page in site/ that polls this endpoint
-		// for changes.
 		ctx := c.Request.Context()
 		u := c.Params.ByName("url")
 		lookupHostResponse, err := net.DefaultResolver.LookupHost(ctx, u)
