@@ -103,6 +103,13 @@ func prepare(r *gin.Engine) *requestCounter {
 	return rc
 }
 
+func writeError(err error, c *gin.Context) {
+	if _, err := c.Writer.WriteString(err.Error()); err != nil {
+		log.Print(err)
+		c.AbortWithStatus(500)
+	}
+}
+
 func main() {
 	ctx := context.Background()
 	port := os.Getenv("PORT")
@@ -130,37 +137,48 @@ func main() {
 		addrs, err := net.DefaultResolver.LookupHost(ctx, u)
 		var dnsErr *net.DNSError
 		if err != nil {
-			switch v := err.(type) {
+			switch err.(type) {
 			case *net.DNSError:
-				dnsErr = v
+				writeError(dnsErr, c)
 			default:
 				log.Print(err)
 				c.AbortWithStatus(500)
 				return
 			}
 		}
-		if len(addrs) > 0 {
-			b, err := json.Marshal(addrs)
-			if err != nil {
-				log.Print(err)
-				c.AbortWithStatus(500)
-				return
-			}
-			b = append([]byte("IP addresses: "), b...)
-			if _, err := c.Writer.Write(b); err != nil {
-				log.Print(err)
-				c.AbortWithStatus(500)
-				return
-			}
-		}
-		if dnsErr != nil {
-			if _, err := c.Writer.WriteString(dnsErr.Error()); err != nil {
-				log.Print(err)
-				c.AbortWithStatus(500)
-			}
+		b, err := json.Marshal(addrs)
+		if err != nil {
+			log.Print(err)
+			c.AbortWithStatus(500)
 			return
 		}
-		// TODO: add other lookups (e.g. LookupNS) and factor out handling of DNS errors.
+		b = append([]byte("IP addresses: "), b...)
+		if _, err := c.Writer.Write(b); err != nil {
+			log.Print(err)
+			c.AbortWithStatus(500)
+			return
+		}
+		nameServers, err := net.DefaultResolver.LookupNS(ctx, u)
+		if err != nil {
+			switch err.(type) {
+			case *net.DNSError:
+				writeError(err, c)
+			default:
+				log.Print(err)
+			}
+		}
+		b, err = json.Marshal(nameServers)
+		if err != nil {
+			log.Print(err)
+			c.AbortWithStatus(500)
+			return
+		}
+		b = append([]byte("Name servers: "), b...)
+		if _, err := c.Writer.Write(b); err != nil {
+			log.Print(err)
+			c.AbortWithStatus(500)
+			return
+		}
 	})
 	srv := &http.Server{
 		Addr:    ":" + port,
