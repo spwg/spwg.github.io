@@ -123,9 +123,13 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	var host string
 	if os.Getenv("FLY_APP_NAME") != "" {
 		log.Printf("Running in the fly.io runtime.")
 		gin.SetMode(gin.ReleaseMode)
+		host = "::"
+	} else {
+		host = "::1"
 	}
 	engine := gin.New()
 	rc := prepare(engine)
@@ -212,7 +216,7 @@ func main() {
 		}
 	})
 	srv := &http.Server{
-		Addr:    "localhost:" + port,
+		Addr:    net.JoinHostPort(host, port),
 		Handler: engine,
 	}
 	go func() {
