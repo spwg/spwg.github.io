@@ -15,9 +15,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"embed"
-	"encoding/json"
 	"errors"
 	"html/template"
 	"io/fs"
@@ -106,6 +106,7 @@ func prepare(r *gin.Engine) *requestCounter {
 }
 
 func main() {
+	log.SetFlags(log.Flags() | log.Lshortfile)
 	ctx := context.Background()
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -125,7 +126,7 @@ func main() {
 		c.FileFromFS(c.Request.URL.Path, http.FS(site))
 	})
 
-	dnsCheckerTemplate, err := template.ParseFS(site, "dnschecker.html.tmpl")
+	t, err := template.ParseFS(site, "dnschecker.tmpl", "dnsresult.tmpl")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -145,12 +146,6 @@ func main() {
 			return
 		}
 		slices.Sort(lookupHostResponse)
-		ipAddrs, err := json.MarshalIndent(lookupHostResponse, "", "  ")
-		if err != nil {
-			log.Print(err)
-			c.AbortWithStatus(500)
-			return
-		}
 		lookupNSResponse, err := net.DefaultResolver.LookupNS(ctx, u)
 		if err != nil {
 			log.Print(err)
@@ -165,29 +160,46 @@ func main() {
 		slices.SortFunc(lookupNSResponse, func(a, b *net.NS) bool {
 			return a.Host < b.Host
 		})
-		nameServers, err := json.MarshalIndent(lookupNSResponse, "", "  ")
+		var nameServers []string
+		for _, n := range lookupNSResponse {
+			nameServers = append(nameServers, n.Host)
+		}
 		if err != nil {
-			log.Print(err)
-			c.AbortWithStatus(500)
+			c.AbortWithError(500, err)
 			return
 		}
-		page := struct {
-			IPAddresses string
-			NameServers string
+		type result struct {
+			IPAddresses []string
+			NameServers []string
 			CurrentTime string
-		}{
-			IPAddresses: string(ipAddrs),
-			NameServers: string(nameServers),
-			CurrentTime: time.Now().UTC().Format(time.RFC3339),
+			NextReload  string
 		}
-		if err := dnsCheckerTemplate.Execute(c.Writer, page); err != nil {
-			log.Print(err)
-			c.AbortWithStatus(500)
+		now := time.Now()
+		r := result{
+			IPAddresses: lookupHostResponse,
+			NameServers: nameServers,
+			CurrentTime: now.UTC().Format(time.RFC3339),
+			NextReload:  now.UTC().Add(time.Minute).Format(time.RFC3339),
+		}
+		// This page uses htmx, which lets the server return html content to update just part of the page.
+		var b bytes.Buffer
+		if c.GetHeader("HX-Request") != "" {
+			// Just execute return the HTML needed to update the page's result element.
+			err = t.ExecuteTemplate(&b, "dns_result", r)
+		} else {
+			// Go nested templates can only receive 1 argument.
+			err = t.Execute(&b, map[string]any{"Result": r})
+		}
+		if err != nil {
+			c.AbortWithError(500, err)
 			return
+		}
+		if _, err := c.Writer.Write(b.Bytes()); err != nil {
+			log.Print(err)
 		}
 	})
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    "localhost:" + port,
 		Handler: engine,
 	}
 	go func() {
