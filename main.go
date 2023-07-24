@@ -19,6 +19,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"flag"
 	"html/template"
 	"io/fs"
 	"log"
@@ -41,6 +42,8 @@ var (
 	cloudflareIPv6Addresses string
 	//go:embed site/*
 	site embed.FS
+
+	shutdownOnIdle = flag.Bool("shutdown_on_idle", true, "Whether to exit after a period of idleness.")
 )
 
 type requestCounter struct {
@@ -107,6 +110,7 @@ func prepare(r *gin.Engine) *requestCounter {
 
 func main() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
+	flag.Parse()
 	ctx := context.Background()
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -216,10 +220,13 @@ func main() {
 		if gin.IsDebugging() {
 			continue
 		}
+		if !*shutdownOnIdle {
+			continue
+		}
 		if rc.Idle() {
 			log.Println("Connections are idle. Shutting down.")
-			// The returned cancel function isn't useful because the process is about to die.
-			ctx, _ := context.WithTimeout(ctx, 5*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
 			if err := srv.Shutdown(ctx); err != nil {
 				log.Fatal(err)
 			}
