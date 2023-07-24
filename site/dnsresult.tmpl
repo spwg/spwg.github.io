@@ -1,5 +1,6 @@
 {{ define "dns_result" }}
-<div id="result" hx-get='' hx-target='this' hx-swap='outerHTML' hx-trigger="every 60s">
+<div hx-get='' hx-target='this' hx-swap='outerHTML' hx-trigger="every 60s">
+{{if .Host}}
 <h1>DNS for {{.Host}}</h1>
 
 <h2>IP addresses</h2>
@@ -18,13 +19,13 @@
 <p>No name servers found.</p>
 {{ end }}
 
-<h2>Time</h2>
-
-<p>It is {{.CurrentTime}}.</p>
 <p>The next update is at {{.NextReload}}.</p>
+{{end}}
 
-<button hx-get='' hx-target='#result' hx-swap='outerHTML' hx-trigger="click">
-Reload now
-</button>
+<form hx-replace-url="true" hx-get="/dnschecker">
+<input type="text" name="host" value="{{.Host}}">
+<button>Lookup</button>
+</form>
+
 </div>
 {{ end }}

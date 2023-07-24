@@ -46,6 +46,13 @@ var (
 	shutdownOnIdle = flag.Bool("shutdown_on_idle", true, "Whether to exit after a period of idleness.")
 )
 
+type dnsPage struct {
+	Host        string
+	IPAddresses []string
+	NameServers []string
+	NextReload  string
+}
+
 type requestCounter struct {
 	processing int
 	last       time.Time
@@ -135,19 +142,32 @@ func main() {
 		log.Fatal(err)
 	}
 
+	engine.GET("/dnschecker", func(c *gin.Context) {
+		h, ok := c.GetQuery("host")
+		if !ok {
+			if err := t.Execute(c.Writer, map[string]any{"Result": dnsPage{}}); err != nil {
+				c.Error(err)
+			}
+			return
+		}
+		c.Redirect(http.StatusTemporaryRedirect, "/dnschecker/"+h)
+	})
 	engine.GET("/dnschecker/:host", func(c *gin.Context) {
 		ctx := c.Request.Context()
 		h := c.Params.ByName("host")
+		if h == "" {
+			c.Redirect(http.StatusTemporaryRedirect, "/dnschecker")
+			return
+		}
 		lookupHostResponse, err := net.DefaultResolver.LookupHost(ctx, h)
 		if err != nil {
 			log.Print(err)
 			switch err.(type) {
 			case *net.DNSError:
-				c.AbortWithError(404, err)
 			default:
 				c.AbortWithError(500, err)
+				return
 			}
-			return
 		}
 		slices.Sort(lookupHostResponse)
 		lookupNSResponse, err := net.DefaultResolver.LookupNS(ctx, h)
@@ -155,11 +175,10 @@ func main() {
 			log.Print(err)
 			switch err.(type) {
 			case *net.DNSError:
-				c.AbortWithError(404, err)
 			default:
 				c.AbortWithError(500, err)
+				return
 			}
-			return
 		}
 		slices.SortFunc(lookupNSResponse, func(a, b *net.NS) bool {
 			return a.Host < b.Host
@@ -168,23 +187,11 @@ func main() {
 		for _, n := range lookupNSResponse {
 			nameServers = append(nameServers, n.Host)
 		}
-		if err != nil {
-			c.AbortWithError(500, err)
-			return
-		}
-		type result struct {
-			Host        string
-			IPAddresses []string
-			NameServers []string
-			CurrentTime string
-			NextReload  string
-		}
 		now := time.Now()
-		r := result{
+		r := dnsPage{
 			Host:        h,
 			IPAddresses: lookupHostResponse,
 			NameServers: nameServers,
-			CurrentTime: now.UTC().Format(time.RFC3339),
 			NextReload:  now.UTC().Add(time.Minute).Format(time.RFC3339),
 		}
 		// This page uses htmx, which lets the server return html content to update just part of the page.
