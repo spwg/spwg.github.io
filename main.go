@@ -135,10 +135,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	engine.GET("/dnschecker/:url", func(c *gin.Context) {
+	engine.GET("/dnschecker/:host", func(c *gin.Context) {
 		ctx := c.Request.Context()
-		u := c.Params.ByName("url")
-		lookupHostResponse, err := net.DefaultResolver.LookupHost(ctx, u)
+		h := c.Params.ByName("host")
+		lookupHostResponse, err := net.DefaultResolver.LookupHost(ctx, h)
 		if err != nil {
 			log.Print(err)
 			switch err.(type) {
@@ -150,7 +150,7 @@ func main() {
 			return
 		}
 		slices.Sort(lookupHostResponse)
-		lookupNSResponse, err := net.DefaultResolver.LookupNS(ctx, u)
+		lookupNSResponse, err := net.DefaultResolver.LookupNS(ctx, h)
 		if err != nil {
 			log.Print(err)
 			switch err.(type) {
@@ -173,6 +173,7 @@ func main() {
 			return
 		}
 		type result struct {
+			Host        string
 			IPAddresses []string
 			NameServers []string
 			CurrentTime string
@@ -180,6 +181,7 @@ func main() {
 		}
 		now := time.Now()
 		r := result{
+			Host:        h,
 			IPAddresses: lookupHostResponse,
 			NameServers: nameServers,
 			CurrentTime: now.UTC().Format(time.RFC3339),
