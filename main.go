@@ -140,6 +140,9 @@ func main() {
 	engine.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(site))
 	})
+	engine.GET("/js/:path", func(c *gin.Context) {
+		c.FileFromFS(c.Request.URL.Path, http.FS(site))
+	})
 
 	t, err := template.ParseFS(site, "dnschecker.tmpl", "dnsresult.tmpl")
 	if err != nil {
