@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/unrolled/secure"
 	"golang.org/x/exp/slices"
@@ -120,6 +121,17 @@ func main() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 	flag.Parse()
 	ctx := context.Background()
+	if os.Getenv("SENTRY_DSN") != "" {
+		log.Printf("Initializing Sentry")
+		options := sentry.ClientOptions{
+			Dsn:              os.Getenv("SENTRY_DSN"),
+			TracesSampleRate: 1.0,
+		}
+		if err := sentry.Init(options); err != nil {
+			log.Fatalf("sentry.Init: %s", err)
+		}
+		defer sentry.Flush(2 * time.Second)
+	}
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
