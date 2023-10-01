@@ -164,20 +164,12 @@ func main() {
 	}
 
 	engine.GET("/dnschecker", func(c *gin.Context) {
+		ctx := c.Request.Context()
 		h, ok := c.GetQuery("host")
 		if !ok {
 			if err := t.Execute(c.Writer, map[string]any{"Result": dnsPage{}}); err != nil {
 				c.Error(err)
 			}
-			return
-		}
-		c.Redirect(http.StatusTemporaryRedirect, "/dnschecker/"+h)
-	})
-	engine.GET("/dnschecker/:host", func(c *gin.Context) {
-		ctx := c.Request.Context()
-		h := c.Params.ByName("host")
-		if h == "" {
-			c.Redirect(http.StatusTemporaryRedirect, "/dnschecker")
 			return
 		}
 		lookupHostResponse, err := net.DefaultResolver.LookupHost(ctx, h)
