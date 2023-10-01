@@ -27,6 +27,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +45,8 @@ var (
 	cloudflareIPv6Addresses string
 	//go:embed templates/*
 	embeddedTemplates embed.FS
+	//go:embed js/*
+	embeddedJS embed.FS
 
 	shutdownOnIdle = flag.Bool("shutdown_on_idle", false, "Whether to exit after a period of idleness.")
 )
@@ -153,8 +156,12 @@ func main() {
 	engine.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(templatesFS))
 	})
+	jsFS, err := fs.Sub(embeddedJS, "js")
+	if err != nil {
+		log.Fatal(err)
+	}
 	engine.GET("/js/:path", func(c *gin.Context) {
-		c.FileFromFS(c.Request.URL.Path, http.FS(templatesFS))
+		c.FileFromFS(path.Base(c.Request.URL.Path), http.FS(jsFS))
 	})
 
 	t, err := template.ParseFS(templatesFS, "dnschecker.tmpl", "dnsresult.tmpl")

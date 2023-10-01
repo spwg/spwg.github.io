@@ -1,5 +1,5 @@
 {{ define "dns_result" }}
-<div hx-target='this' hx-swap='outerHTML'>
+<div id="result">
 {{if .Host}}
 <h1>DNS for {{.Host}}</h1>
 
@@ -21,7 +21,7 @@
 
 {{end}}
 
-<form hx-replace-url="true" hx-get="/dnschecker">
+<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result">
 <input type="text" name="host" value="{{.Host}}">
 <button>Lookup</button>
 </form>
