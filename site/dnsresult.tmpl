@@ -1,5 +1,5 @@
 {{ define "dns_result" }}
-<div hx-get='' hx-target='this' hx-swap='outerHTML' hx-trigger="every 60s">
+<div hx-target='this' hx-swap='outerHTML'>
 {{if .Host}}
 <h1>DNS for {{.Host}}</h1>
 
@@ -19,7 +19,6 @@
 <p>No name servers found.</p>
 {{ end }}
 
-<p>The next update is at {{.NextReload}}.</p>
 {{end}}
 
 <form hx-replace-url="true" hx-get="/dnschecker">
