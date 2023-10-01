@@ -1,0 +1,30 @@
+{{ define "dns_result" }}
+<div id="result">
+{{if .Host}}
+<h1>DNS for {{.Host}}</h1>
+
+<h2>IP addresses</h2>
+
+{{if .IPAddresses}}
+<ol>{{range .IPAddresses}}<li>{{ . }}</li>{{ end }}</ol>
+{{else}}
+<p>No IP addresses found.</p>
+{{end}}
+
+<h2>Name servers</h2>
+
+{{if .NameServers}}
+<ol>{{ range .NameServers }}<li>{{ . }}</li>{{end}}</ol>
+{{else}}
+<p>No name servers found.</p>
+{{ end }}
+
+{{end}}
+
+<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result">
+<input type="text" name="host" value="{{.Host}}">
+<button>Lookup</button>
+</form>
+
+</div>
+{{ end }}
