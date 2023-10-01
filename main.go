@@ -42,8 +42,8 @@ var (
 	cloudflareIPv4Addresses string
 	//go:embed cloudflare_ipv6.txt
 	cloudflareIPv6Addresses string
-	//go:embed site/*
-	site embed.FS
+	//go:embed templates/*
+	embeddedTemplates embed.FS
 
 	shutdownOnIdle = flag.Bool("shutdown_on_idle", false, "Whether to exit after a period of idleness.")
 )
@@ -146,18 +146,18 @@ func main() {
 	}
 	engine := gin.New()
 	rc := prepare(engine)
-	site, err := fs.Sub(site, "site")
+	templatesFS, err := fs.Sub(embeddedTemplates, "templates")
 	if err != nil {
 		log.Fatal(err)
 	}
 	engine.GET("/", func(c *gin.Context) {
-		c.FileFromFS(c.Request.URL.Path, http.FS(site))
+		c.FileFromFS(c.Request.URL.Path, http.FS(templatesFS))
 	})
 	engine.GET("/js/:path", func(c *gin.Context) {
-		c.FileFromFS(c.Request.URL.Path, http.FS(site))
+		c.FileFromFS(c.Request.URL.Path, http.FS(templatesFS))
 	})
 
-	t, err := template.ParseFS(site, "dnschecker.tmpl", "dnsresult.tmpl")
+	t, err := template.ParseFS(templatesFS, "dnschecker.tmpl", "dnsresult.tmpl")
 	if err != nil {
 		log.Fatal(err)
 	}
