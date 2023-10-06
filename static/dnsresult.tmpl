@@ -21,28 +21,28 @@
 
 {{end}}
 
-<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result">
+<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result" hx-push-url=true>
 <input type="text" name="host" value="{{.Host}}">
 <button>Lookup</button>
 </form>
 
 <div class="dnsfooter">
 
-<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result">
+<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result" hx-push-url=true>
 <button>clear</button>
 </form>
 
-<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result">
+<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result" hx-push-url=true>
 <input hidden type="text" name="host" value="spencergreene.com">
 <button>self</button>
 </form>
 
-<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result">
+<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result" hx-push-url=true>
 <input hidden type="text" name="host" value="brown.edu">
 <button>brown</button>
 </form>
 
-<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result">
+<form hx-replace-url="true" hx-get="/dnschecker" hx-target="#result" hx-push-url=true>
 <input hidden type="text" name="host" value="google.com">
 <button>google</button>
 </form>
