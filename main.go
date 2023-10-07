@@ -17,7 +17,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"embed"
 	"errors"
 	"flag"
@@ -29,7 +28,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -56,34 +54,7 @@ type dnsPage struct {
 	NextReload  string
 }
 
-type requestCounter struct {
-	processing int
-	last       time.Time
-	mu         sync.Mutex
-}
-
-func (rc *requestCounter) Increment() {
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-	rc.last = time.Now()
-	rc.processing++
-}
-
-func (rc *requestCounter) Decrement() {
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-	rc.last = time.Now()
-	rc.processing--
-}
-
-// Idle returns whether the server is idle and can suspend.
-func (rc *requestCounter) Idle() bool {
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-	return rc.processing == 0 && time.Since(rc.last) > time.Second
-}
-
-func prepare(r *gin.Engine) *requestCounter {
+func prepare(r *gin.Engine) {
 	// Setup logging and recovery first so that the logging happens first
 	// and then recovery happens before any other middleware.
 	r.Use(gin.Logger())
@@ -109,19 +80,12 @@ func prepare(r *gin.Engine) *requestCounter {
 		}
 	})
 	r.SetTrustedProxies(append(strings.Fields(cloudflareIPv4Addresses), strings.Fields(cloudflareIPv6Addresses)...))
-	rc := &requestCounter{}
-	r.Use(func(c *gin.Context) {
-		rc.Increment()
-		c.Next()
-		rc.Decrement()
-	})
-	return rc
+	return
 }
 
 func main() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 	flag.Parse()
-	ctx := context.Background()
 	if os.Getenv("SENTRY_DSN") != "" {
 		log.Printf("Initializing Sentry")
 		options := sentry.ClientOptions{
@@ -146,7 +110,7 @@ func main() {
 		host = "::1"
 	}
 	engine := gin.New()
-	rc := prepare(engine)
+	prepare(engine)
 	staticFS, err := fs.Sub(embeddedStatic, "static")
 	if err != nil {
 		log.Fatal(err)
@@ -231,31 +195,7 @@ func main() {
 		Addr:    net.JoinHostPort(host, port),
 		Handler: engine,
 	}
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err)
-		}
-	}()
-	// Wait until Shutdown returns because ListenAndServe returns immediately when it's called.
-	// Shutdown the server when idle. Fly will start it automatically when it receives a request.
-	for {
-		// Wait a minute before shutdown in order to let Fly health check the server first
-		// exiting. This helps with health checks during deployments.
-		time.Sleep(time.Minute)
-		if gin.IsDebugging() {
-			continue
-		}
-		if !*shutdownOnIdle {
-			continue
-		}
-		if rc.Idle() {
-			log.Println("Connections are idle. Shutting down.")
-			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			defer cancel()
-			if err := srv.Shutdown(ctx); err != nil {
-				log.Fatal(err)
-			}
-			return
-		}
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatal(err)
 	}
 }
