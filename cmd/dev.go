@@ -1,3 +1,4 @@
+// Binary dev automatically restarts the server when changes are detected.
 package main
 
 import (
@@ -21,23 +22,12 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fswatch := exec.Command("/usr/local/bin/fswatch", ".")
-		out, err := fswatch.StdoutPipe()
+		p, err := watch()
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := fswatch.Start(); err != nil {
-			log.Fatal(err)
-		}
-		r := bufio.NewReader(out)
-		b, err := r.ReadBytes('\n')
-		if err != nil {
-			log.Fatal(err)
-		}
-		p := strings.TrimSpace(string(b))
 		fmt.Printf("File change: %q\n", p)
 		fmt.Println("Stopping")
-		_ = fswatch.Process.Kill()
 		if err := cmd.Process.Signal(unix.SIGINT); err != nil {
 			log.Fatal(err)
 		}
@@ -63,4 +53,26 @@ func run() (*exec.Cmd, error) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd, cmd.Start()
+}
+
+func watch() (string, error) {
+	fswatch := exec.Command("/usr/local/bin/fswatch", ".")
+	out, err := fswatch.StdoutPipe()
+	if err != nil {
+		return "", fmt.Errorf("watch: stdout: %v", err)
+	}
+	if err := fswatch.Start(); err != nil {
+		return "", fmt.Errorf("watch: start: %v", err)
+	}
+	defer func() {
+		_ = fswatch.Process.Kill()
+		// _, _ = fswatch.Process.Wait()
+	}()
+	r := bufio.NewReader(out)
+	b, err := r.ReadBytes('\n')
+	if err != nil {
+		return "", fmt.Errorf("watch: read: %v", err)
+	}
+	p := strings.TrimSpace(string(b))
+	return p, nil
 }
