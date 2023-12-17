@@ -43,8 +43,6 @@ var (
 	cloudflareIPv6Addresses string
 	//go:embed static/*
 	embeddedStatic embed.FS
-
-	shutdownOnIdle = flag.Bool("shutdown_on_idle", false, "Whether to exit after a period of idleness.")
 )
 
 type dnsPage struct {
@@ -80,7 +78,6 @@ func prepare(r *gin.Engine) {
 		}
 	})
 	r.SetTrustedProxies(append(strings.Fields(cloudflareIPv4Addresses), strings.Fields(cloudflareIPv6Addresses)...))
-	return
 }
 
 func main() {
