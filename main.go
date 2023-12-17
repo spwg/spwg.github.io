@@ -53,9 +53,9 @@ type dnsPage struct {
 	NextReload  string
 }
 
-func prepare(r *gin.Engine) {
-	// Setup logging and recovery first so that the logging happens first
-	// and then recovery happens before any other middleware.
+// installMiddleware sets up logging and recovery first so that the logging
+// happens first and then recovery happens before any other middleware.
+func installMiddleware(r *gin.Engine) {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	secureMiddleware := secure.New(secure.Options{
@@ -81,39 +81,8 @@ func prepare(r *gin.Engine) {
 	r.SetTrustedProxies(append(strings.Fields(cloudflareIPv4Addresses), strings.Fields(cloudflareIPv6Addresses)...))
 }
 
-func main() {
-	log.SetFlags(log.Flags() | log.Lshortfile)
-	flag.Parse()
-	if os.Getenv("SENTRY_DSN") != "" {
-		log.Printf("Initializing Sentry")
-		options := sentry.ClientOptions{
-			Dsn:              os.Getenv("SENTRY_DSN"),
-			TracesSampleRate: 1.0,
-		}
-		if err := sentry.Init(options); err != nil {
-			log.Fatalf("sentry.Init: %s", err)
-		}
-		defer sentry.Flush(2 * time.Second)
-	}
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	var host string
-	if os.Getenv("FLY_APP_NAME") != "" {
-		log.Printf("Running in the fly.io runtime.")
-		gin.SetMode(gin.ReleaseMode)
-		host = "::"
-	} else {
-		fmt.Fprintf(os.Stderr, "Starting server on http://localhost:%v\n", port)
-		host = "::1"
-	}
-	engine := gin.New()
-	prepare(engine)
-	staticFS, err := fs.Sub(embeddedStatic, "static")
-	if err != nil {
-		log.Fatal(err)
-	}
+// installStaticRoutes registers the routes for static pages on the engine.
+func installStaticRoutes(staticFS fs.FS, engine *gin.Engine) {
 	engine.GET("/", func(c *gin.Context) {
 		c.FileFromFS(c.Request.URL.Path, http.FS(staticFS))
 	})
@@ -123,12 +92,15 @@ func main() {
 	engine.GET("/css/:path", func(c *gin.Context) {
 		c.FileFromFS(c.Params.ByName("path"), http.FS(staticFS))
 	})
+}
 
+// installDNSRoutes registers the routes for the dns checker pages on the
+// engine.
+func installDNSRoutes(staticFS fs.FS, engine *gin.Engine) {
 	t, err := template.ParseFS(staticFS, "dnschecker.tmpl", "dnsresult.tmpl")
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	engine.GET("/dnschecker", func(c *gin.Context) {
 		ctx := c.Request.Context()
 		h, ok := c.GetQuery("host")
@@ -190,6 +162,43 @@ func main() {
 			log.Print(err)
 		}
 	})
+}
+
+func main() {
+	log.SetFlags(log.Flags() | log.Lshortfile)
+	flag.Parse()
+	if os.Getenv("SENTRY_DSN") != "" {
+		log.Printf("Initializing Sentry")
+		options := sentry.ClientOptions{
+			Dsn:              os.Getenv("SENTRY_DSN"),
+			TracesSampleRate: 1.0,
+		}
+		if err := sentry.Init(options); err != nil {
+			log.Fatalf("sentry.Init: %s", err)
+		}
+		defer sentry.Flush(2 * time.Second)
+	}
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	var host string
+	if os.Getenv("FLY_APP_NAME") != "" {
+		log.Printf("Running in the fly.io runtime.")
+		gin.SetMode(gin.ReleaseMode)
+		host = "::"
+	} else {
+		fmt.Fprintf(os.Stderr, "Starting server on http://localhost:%v\n", port)
+		host = "::1"
+	}
+	engine := gin.New()
+	installMiddleware(engine)
+	staticFS, err := fs.Sub(embeddedStatic, "static")
+	if err != nil {
+		log.Fatal(err)
+	}
+	installStaticRoutes(staticFS, engine)
+	installDNSRoutes(staticFS, engine)
 	srv := &http.Server{
 		Addr:    net.JoinHostPort(host, port),
 		Handler: engine,
