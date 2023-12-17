@@ -84,3 +84,9 @@ func DNSChecker(t *template.Template) gin.HandlerFunc {
 		}
 	}
 }
+
+// AircraftFeed is the endpoint for aircraft data feed.
+func AircraftFeed(c *gin.Context) {
+	// TODO: configure the service to read from gcs, rate limiting, and making
+	// the web page.
+}
