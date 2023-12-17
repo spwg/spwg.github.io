@@ -7,12 +7,6 @@
 // return IP addresses that route to its own CDN. If there's no cache hit, it
 // sends the request to Fly. Fly terminates the TLS connection from Cloudflare
 // and forwards the request to this web server.
-//
-// If necessary, Fly will start the server to respond to the request. That means
-// this binary should start up fast. To suspend again, it exits after a period
-// of idleness, which means processing zero requests, but only if the flag
-// --shutdown_on_idle is true. So, most of the time it doesn't consume any CPU
-// or memory because it's not running.
 package main
 
 import (
