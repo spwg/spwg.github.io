@@ -4,7 +4,10 @@ package handlers
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"html/template"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -12,6 +15,7 @@ import (
 	"path"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/exp/slices"
 )
@@ -95,6 +99,35 @@ func (s *server) aircraftFeed(c *gin.Context) {
 	// TODO:gcs service configuration, rate limiting, the web page, and an integration test.
 	//
 	// For now, just display the stats.json file.
+	ctx := c.Request.Context()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	r, err := client.Bucket("dump1090-data").Object("stats.json").NewReader(ctx)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	defer r.Close()
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		c.Error(err)
+		return
+	}
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, buf.Bytes(), "", "  "); err != nil {
+		c.Error(err)
+		return
+	}
+	if _, err := c.Writer.Write(pretty.Bytes()); err != nil {
+		c.Error(err)
+		return
+	}
 }
 
 func (s *server) root(c *gin.Context) {
