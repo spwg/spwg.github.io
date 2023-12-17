@@ -1,3 +1,5 @@
+// Package handlers provides functionality for endpoints that should be
+// installed on the server.
 package handlers
 
 import (
