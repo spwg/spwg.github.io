@@ -20,6 +20,7 @@ import (
 	"embed"
 	"errors"
 	"flag"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
@@ -104,6 +105,7 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 		host = "::"
 	} else {
+		fmt.Fprintf(os.Stderr, "Starting server on http://localhost:%v\n", port)
 		host = "::1"
 	}
 	engine := gin.New()
