@@ -22,6 +22,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// Server holds a collection of service endpoints.
 type Server struct {
 	static fs.FS
 	t      *template.Template
