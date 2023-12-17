@@ -14,13 +14,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"html/template"
 	"io/fs"
 	"log"
 	"net"
 	"net/http"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -67,29 +65,6 @@ func installMiddleware(r *gin.Engine) {
 	r.SetTrustedProxies(append(strings.Fields(cloudflareIPv4Addresses), strings.Fields(cloudflareIPv6Addresses)...))
 }
 
-// installStaticRoutes registers the routes for static pages on the engine.
-func installStaticRoutes(staticFS fs.FS, engine *gin.Engine) {
-	engine.GET("/", func(c *gin.Context) {
-		c.FileFromFS(c.Request.URL.Path, http.FS(staticFS))
-	})
-	engine.GET("/js/:path", func(c *gin.Context) {
-		c.FileFromFS(path.Base(c.Request.URL.Path), http.FS(staticFS))
-	})
-	engine.GET("/css/:path", func(c *gin.Context) {
-		c.FileFromFS(c.Params.ByName("path"), http.FS(staticFS))
-	})
-}
-
-// installDNSRoutes registers the routes for the dns checker pages on the
-// engine.
-func installDNSRoutes(staticFS fs.FS, engine *gin.Engine) {
-	t, err := template.ParseFS(staticFS, "dnschecker.tmpl", "dnsresult.tmpl")
-	if err != nil {
-		log.Fatal(err)
-	}
-	engine.GET("/dnschecker", handlers.DNSChecker(t))
-}
-
 func main() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 	flag.Parse()
@@ -123,8 +98,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	installStaticRoutes(staticFS, engine)
-	installDNSRoutes(staticFS, engine)
+	handlers.InstallRoutes(staticFS, engine)
 	srv := &http.Server{
 		Addr:    net.JoinHostPort(host, port),
 		Handler: engine,

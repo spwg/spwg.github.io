@@ -5,8 +5,11 @@ package handlers
 import (
 	"bytes"
 	"html/template"
+	"io/fs"
 	"log"
 	"net"
+	"net/http"
+	"path"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,8 +23,8 @@ type dnsPage struct {
 	NextReload  string
 }
 
-// DNSChecker is the endpoint for the dns tool.
-func DNSChecker(t *template.Template) gin.HandlerFunc {
+// dnsChecker is the endpoint for the dns tool.
+func dnsChecker(t *template.Template) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		h, ok := c.GetQuery("host")
@@ -89,4 +92,34 @@ func DNSChecker(t *template.Template) gin.HandlerFunc {
 func AircraftFeed(c *gin.Context) {
 	// TODO: configure the service to read from gcs, rate limiting, and making
 	// the web page.
+}
+
+// InstallRoutes registers the server's routes on the given [*gin.Engine].
+func InstallRoutes(sys fs.FS, engine *gin.Engine) *gin.Engine {
+	installStaticRoutes(sys, engine)
+	installDNSRoutes(sys, engine)
+	return engine
+}
+
+// installStaticRoutes registers the routes for static pages on the engine.
+func installStaticRoutes(staticFS fs.FS, engine *gin.Engine) {
+	engine.GET("/", func(c *gin.Context) {
+		c.FileFromFS(c.Request.URL.Path, http.FS(staticFS))
+	})
+	engine.GET("/js/:path", func(c *gin.Context) {
+		c.FileFromFS(path.Base(c.Request.URL.Path), http.FS(staticFS))
+	})
+	engine.GET("/css/:path", func(c *gin.Context) {
+		c.FileFromFS(c.Params.ByName("path"), http.FS(staticFS))
+	})
+}
+
+// installDNSRoutes registers the routes for the dns checker pages on the
+// engine.
+func installDNSRoutes(staticFS fs.FS, engine *gin.Engine) {
+	t, err := template.ParseFS(staticFS, "dnschecker.tmpl", "dnsresult.tmpl")
+	if err != nil {
+		log.Fatal(err)
+	}
+	engine.GET("/dnschecker", dnsChecker(t))
 }
