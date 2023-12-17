@@ -13,16 +13,29 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/exp/slices"
+	"golang.org/x/time/rate"
 )
 
-type server struct {
+type Server struct {
 	static fs.FS
 	t      *template.Template
+
+	// gcsReadLimiter rate limits reads from google cloud storage.
+	gcsReadLimiter *rate.Limiter
+
+	// stats is the most recently read bytes of the stats.json file.
+	statsMu sync.Mutex
+	stats   []byte
+
+	// ready is closed when the server is ready to start.
+	ready     chan struct{}
+	readyOnce sync.Once
 }
 
 type dnsPage struct {
@@ -32,7 +45,7 @@ type dnsPage struct {
 	NextReload  string
 }
 
-func (s *server) dnsChecker(c *gin.Context) {
+func (s *Server) dnsChecker(c *gin.Context) {
 	ctx := c.Request.Context()
 	h, ok := c.GetQuery("host")
 	if !ok {
@@ -95,64 +108,108 @@ func (s *server) dnsChecker(c *gin.Context) {
 }
 
 // aircraftFeed is the endpoint for aircraft data feed.
-func (s *server) aircraftFeed(c *gin.Context) {
-	// TODO:gcs service configuration, rate limiting, the web page, and an integration test.
+func (s *Server) aircraftFeed(c *gin.Context) {
+	// TODO:gcs service configuration, the web page, and an integration test.
 	//
 	// For now, just display the stats.json file.
-	ctx := c.Request.Context()
+	s.statsMu.Lock()
+	defer s.statsMu.Unlock()
+	if _, err := c.Writer.Write(s.stats); err != nil {
+		c.Error(err)
+	}
+}
+
+// RunBackgroundTasks runs tasks until ctx is canceled or an error is
+// encountered. Should be called in a goroutine.
+func (s *Server) RunBackgroundTasks(ctx context.Context) error {
+	done := ctx.Done()
+	for {
+		select {
+		case <-done:
+			return nil
+		default:
+		}
+		if err := s.gcsReadLimiter.Wait(ctx); err != nil {
+			return err
+		}
+		log.Println("Downloading stats.json file")
+		b, err := downloadStats(ctx)
+		if err != nil {
+			return err
+		}
+		log.Println("Download complete")
+		s.statsMu.Lock()
+		s.stats = b
+		s.statsMu.Unlock()
+		s.readyOnce.Do(func() {
+			close(s.ready)
+		})
+	}
+}
+
+func downloadStats(ctx context.Context) ([]byte, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		c.Error(err)
-		return
+		return nil, err
 	}
 	defer client.Close()
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	r, err := client.Bucket("dump1090-data").Object("stats.json").NewReader(ctx)
 	if err != nil {
-		c.Error(err)
-		return
+		return nil, err
 	}
 	defer r.Close()
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, r); err != nil {
-		c.Error(err)
-		return
+		return nil, err
 	}
 	var pretty bytes.Buffer
 	if err := json.Indent(&pretty, buf.Bytes(), "", "  "); err != nil {
-		c.Error(err)
-		return
+		return nil, err
 	}
-	if _, err := c.Writer.Write(pretty.Bytes()); err != nil {
-		c.Error(err)
-		return
-	}
+	return pretty.Bytes(), nil
 }
 
-func (s *server) root(c *gin.Context) {
+func (s *Server) root(c *gin.Context) {
 	c.FileFromFS(c.Request.URL.Path, http.FS(s.static))
 }
 
-func (s *server) js(c *gin.Context) {
+func (s *Server) js(c *gin.Context) {
 	c.FileFromFS(path.Base(c.Request.URL.Path), http.FS(s.static))
 }
 
-func (s *server) css(c *gin.Context) {
+func (s *Server) css(c *gin.Context) {
 	c.FileFromFS(c.Params.ByName("path"), http.FS(s.static))
 }
 
+// Ready waits until server initialization is done.
+func (s *Server) Ready(ctx context.Context) error {
+	select {
+	case <-s.ready:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // InstallRoutes registers the server's routes on the given [*gin.Engine].
-func InstallRoutes(static fs.FS, engine *gin.Engine) *gin.Engine {
+func InstallRoutes(static fs.FS, engine *gin.Engine, statsRefresh time.Duration) *Server {
 	t, err := template.ParseFS(static, "dnschecker.tmpl", "dnsresult.tmpl")
 	if err != nil {
 		log.Fatal(err)
 	}
-	s := &server{static, t}
+	s := &Server{
+		static:         static,
+		t:              t,
+		gcsReadLimiter: rate.NewLimiter(rate.Every(statsRefresh), 1),
+		statsMu:        sync.Mutex{},
+		ready:          make(chan struct{}),
+	}
 	engine.GET("/", s.root)
 	engine.GET("/js/:path", s.js)
 	engine.GET("/css/:path", s.css)
 	engine.GET("/dnschecker", s.dnsChecker)
 	engine.GET("/aircraft/feed", s.aircraftFeed)
-	return engine
+	return s
 }

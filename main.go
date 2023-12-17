@@ -10,10 +10,10 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"flag"
-	"fmt"
 	"io/fs"
 	"log"
 	"net"
@@ -35,6 +35,11 @@ var (
 	cloudflareIPv6Addresses string
 	//go:embed static/*
 	embeddedStatic embed.FS
+
+	gcsReadRate = flag.Duration("gcs_read_rate", 6*time.Hour,
+		"Frequency at which to read from google cloud storage.")
+	startupTimeout = flag.Duration("startup_timeout", 30*time.Second,
+		"Duration in which server initialization must happen.")
 )
 
 // installMiddleware sets up logging and recovery first so that the logging
@@ -66,7 +71,8 @@ func installMiddleware(r *gin.Engine) {
 }
 
 func main() {
-	log.SetFlags(log.Flags() | log.Lshortfile)
+	ctx := context.Background()
+	log.SetFlags(log.Flags() | log.Lshortfile | log.Lmicroseconds)
 	flag.Parse()
 	if os.Getenv("SENTRY_DSN") != "" {
 		log.Printf("Initializing Sentry")
@@ -89,7 +95,6 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 		host = "::"
 	} else {
-		fmt.Fprintf(os.Stderr, "Starting server on http://localhost:%v\n", port)
 		host = "::1"
 	}
 	engine := gin.New()
@@ -98,11 +103,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	handlers.InstallRoutes(staticFS, engine)
+	server := handlers.InstallRoutes(staticFS, engine, *gcsReadRate)
+	go func() {
+		if err := server.RunBackgroundTasks(ctx); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	log.Printf("Waiting for server readiness")
+	ctxReady, cancel := context.WithTimeout(ctx, *startupTimeout)
+	if err := server.Ready(ctxReady); err != nil {
+		log.Fatal(err)
+	}
+	cancel()
 	srv := &http.Server{
 		Addr:    net.JoinHostPort(host, port),
 		Handler: engine,
 	}
+	log.Printf("Listening on %v\n", net.JoinHostPort(host, port))
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
