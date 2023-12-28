@@ -112,7 +112,7 @@ func (s *Server) dnsChecker(c *gin.Context) {
 
 // aircraftFeed is the endpoint for aircraft data feed.
 func (s *Server) aircraftFeed(c *gin.Context) {
-	// TODO: the web page and an integration test.
+	// TODO: the web page, an integration test, and caching.
 	//
 	// For now, just display the stats.json file.
 	s.statsMu.Lock()
