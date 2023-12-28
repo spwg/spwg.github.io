@@ -131,7 +131,14 @@ func (s *Server) RunBackgroundTasks(ctx context.Context) error {
 	// This is currently configured with Fly Secrets, which are available to the
 	// server at run time only. Docs: https://fly.io/docs/reference/secrets/.
 	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") != "" {
+		log.Println("Using credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON")
 		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))))
+	} else if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
+		// TODO: delete this branch after removing the secret and verifying a release is using the other branch.
+		log.Println("Using credentials from GOOGLE_APPLICATION_CREDENTIALS.")
+		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))))
+	} else {
+		log.Println("No credentials found in environment variables.")
 	}
 	client, err := storage.NewClient(ctx, options...)
 	if err != nil {
