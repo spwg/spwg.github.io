@@ -40,9 +40,8 @@ var (
 		"Frequency at which to read from google cloud storage.")
 	startupTimeout = flag.Duration("startup_timeout", 30*time.Second,
 		"Duration in which server initialization must happen.")
-	// TODO: enable this and delete the flag when the server is configured to
-	// read from GCS.
-	enableBackgroundTasks = flag.Bool("enable_background_tasks", false,
+	// TODO: delete the flag when the server is configured to read from GCS.
+	enableBackgroundTasks = flag.Bool("enable_background_tasks", true,
 		"Enable background tasks such as reading from GCS.")
 )
 

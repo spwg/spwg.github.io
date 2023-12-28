@@ -3,10 +3,12 @@ module github.com/spwg/personal-website
 go 1.20
 
 require (
+	cloud.google.com/go/storage v1.36.0
 	github.com/getsentry/sentry-go v0.24.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/unrolled/secure v1.13.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
+	golang.org/x/time v0.3.0
 )
 
 require (
@@ -14,7 +16,6 @@ require (
 	cloud.google.com/go/compute v1.23.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.3 // indirect
-	cloud.google.com/go/storage v1.36.0 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
@@ -46,7 +47,6 @@ require (
 	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/api v0.150.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

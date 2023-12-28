@@ -110,7 +110,7 @@ func (s *Server) dnsChecker(c *gin.Context) {
 
 // aircraftFeed is the endpoint for aircraft data feed.
 func (s *Server) aircraftFeed(c *gin.Context) {
-	// TODO: gcs service configuration, the web page, and an integration test.
+	// TODO: the web page and an integration test.
 	//
 	// For now, just display the stats.json file.
 	s.statsMu.Lock()
@@ -123,6 +123,11 @@ func (s *Server) aircraftFeed(c *gin.Context) {
 // RunBackgroundTasks runs tasks until ctx is canceled or an error is
 // encountered. Should be called in a goroutine.
 func (s *Server) RunBackgroundTasks(ctx context.Context) error {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
 	done := ctx.Done()
 	for {
 		select {
@@ -130,11 +135,12 @@ func (s *Server) RunBackgroundTasks(ctx context.Context) error {
 			return nil
 		default:
 		}
+		log.Println("Waiting")
 		if err := s.gcsReadLimiter.Wait(ctx); err != nil {
 			return err
 		}
 		log.Println("Downloading stats.json file")
-		b, err := downloadStats(ctx)
+		b, err := downloadStats(ctx, client)
 		if err != nil {
 			return err
 		}
@@ -148,12 +154,7 @@ func (s *Server) RunBackgroundTasks(ctx context.Context) error {
 	}
 }
 
-func downloadStats(ctx context.Context) ([]byte, error) {
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer client.Close()
+func downloadStats(ctx context.Context, client *storage.Client) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	r, err := client.Bucket("dump1090-data").Object("stats.json").NewReader(ctx)
