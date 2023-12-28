@@ -12,7 +12,8 @@ kill_timeout = "5s"
   auto_rollback = true
 
 [build]
-  dockerfile = "Dockerfile"
+  builder = "paketobuildpacks/builder:base"
+  buildpacks = ["gcr.io/paketo-buildpacks/go"]
 
 [env]
   PORT = "8080"

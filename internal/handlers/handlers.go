@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"path"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
+	"google.golang.org/api/option"
 )
 
 // Server holds a collection of service endpoints.
@@ -123,7 +125,10 @@ func (s *Server) aircraftFeed(c *gin.Context) {
 // RunBackgroundTasks runs tasks until ctx is canceled or an error is
 // encountered. Should be called in a goroutine.
 func (s *Server) RunBackgroundTasks(ctx context.Context) error {
-	client, err := storage.NewClient(ctx)
+	options := []option.ClientOption{
+		option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))),
+	}
+	client, err := storage.NewClient(ctx, options...)
 	if err != nil {
 		return err
 	}
