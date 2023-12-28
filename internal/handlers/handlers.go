@@ -125,8 +125,13 @@ func (s *Server) aircraftFeed(c *gin.Context) {
 // RunBackgroundTasks runs tasks until ctx is canceled or an error is
 // encountered. Should be called in a goroutine.
 func (s *Server) RunBackgroundTasks(ctx context.Context) error {
-	options := []option.ClientOption{
-		option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))),
+	var options []option.ClientOption
+	// When GOOGLE_APPLICATION_CREDENTIALS_JSON is set, it'll be the JSON
+	// contents of the credentials necessary to authenticate with Google Cloud.
+	// This is currently configured with Fly Secrets, which are available to the
+	// server at run time only. Docs: https://fly.io/docs/reference/secrets/.
+	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") != "" {
+		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))))
 	}
 	client, err := storage.NewClient(ctx, options...)
 	if err != nil {
@@ -159,6 +164,8 @@ func (s *Server) RunBackgroundTasks(ctx context.Context) error {
 	}
 }
 
+// DownloadStats reads the stats.json file from from the given
+// [*storage.Client]. The client should already be authenticated.
 func downloadStats(ctx context.Context, client *storage.Client) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
