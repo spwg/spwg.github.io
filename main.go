@@ -14,6 +14,7 @@ import (
 	"embed"
 	"errors"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net"
@@ -47,7 +48,7 @@ var (
 
 // installMiddleware sets up logging and recovery first so that the logging
 // happens first and then recovery happens before any other middleware.
-func installMiddleware(r *gin.Engine) {
+func installMiddleware(r *gin.Engine) error {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	secureMiddleware := secure.New(secure.Options{
@@ -70,7 +71,13 @@ func installMiddleware(r *gin.Engine) {
 			c.Abort()
 		}
 	})
-	r.SetTrustedProxies(append(strings.Fields(cloudflareIPv4Addresses), strings.Fields(cloudflareIPv6Addresses)...))
+	var proxies []string
+	proxies = append(proxies, strings.Fields(cloudflareIPv4Addresses)...)
+	proxies = append(proxies, strings.Fields(cloudflareIPv6Addresses)...)
+	if err := r.SetTrustedProxies(proxies); err != nil {
+		return fmt.Errorf("install middleware: %v", err)
+	}
+	return nil
 }
 
 func main() {
