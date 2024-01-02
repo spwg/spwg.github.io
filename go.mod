@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	cloud.google.com/go/storage v1.36.0
-	github.com/getsentry/sentry-go v0.24.1
+	github.com/getsentry/sentry-go v0.25.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/unrolled/secure v1.14.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
