@@ -8,7 +8,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/unrolled/secure v1.13.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
-	golang.org/x/time v0.3.0
+	golang.org/x/time v0.5.0
 	google.golang.org/api v0.150.0
 )
 
