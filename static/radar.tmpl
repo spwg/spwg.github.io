@@ -1,0 +1,23 @@
+<html>
+<head>
+<script src="/js/htmx.min.js"></script>
+<link rel="stylesheet" href="/css/radar.css">
+</head>
+<body>
+<h1>nyc flight radar</h1>
+<h2>historical data</h2>
+<table>
+<tr>
+<th>Flight</th>
+<th>Time</th>
+</tr>
+{{range .Flights}}
+<tr>
+<td>{{.Code}}</td>
+<td>{{.When}}</td>
+</tr>
+{{end}}
+</table>
+
+</body>
+</html>

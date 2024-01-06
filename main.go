@@ -39,11 +39,11 @@ var (
 
 	gcsReadRate = flag.Duration("gcs_read_rate", 6*time.Hour,
 		"Frequency at which to read from google cloud storage.")
-	startupTimeout = flag.Duration("startup_timeout", 30*time.Second,
-		"Duration in which server initialization must happen.")
-	// TODO: delete the flag when the server is configured to read from GCS.
-	enableBackgroundTasks = flag.Bool("enable_background_tasks", true,
+	downloadHistoricalDataFromGCS = flag.Bool("download_historical_data_from_gcs", os.Getenv("FLY_APP_NAME") != "",
 		"Enable background tasks such as reading from GCS.")
+	dump1090DataDirectory = flag.String("dump1090_data_directory", "/tmp/dump1090-data",
+		"If in dev, read from this directory instead of GCS.")
+	useDataDirectory = flag.Bool("use_data_directory", os.Getenv("FLY_APP_NAME") == "", "")
 )
 
 // installMiddleware sets up logging and recovery first so that the logging
@@ -114,18 +114,26 @@ func main() {
 		log.Fatal(err)
 	}
 	server := handlers.InstallRoutes(staticFS, engine, *gcsReadRate)
-	if *enableBackgroundTasks {
-		go func() {
-			if err := server.RunBackgroundTasks(ctx); err != nil {
-				log.Fatal(err)
-			}
-		}()
-		log.Printf("Waiting for server readiness")
-		ctxReady, cancel := context.WithTimeout(ctx, *startupTimeout)
-		if err := server.Ready(ctxReady); err != nil {
+	if *useDataDirectory && !*downloadHistoricalDataFromGCS {
+		if err := server.SetDump1090DataDirectory(*dump1090DataDirectory); err != nil {
 			log.Fatal(err)
 		}
-		cancel()
+	}
+	if *downloadHistoricalDataFromGCS {
+		go func() {
+			ticker := time.NewTicker(6 * time.Hour)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					if err := server.DownloadHistoricalDataFromGCS(ctx); err != nil {
+						log.Fatal(err)
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
 	}
 	srv := &http.Server{
 		Addr:    net.JoinHostPort(host, port),

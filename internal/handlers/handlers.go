@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"io"
 	"io/fs"
@@ -14,13 +15,13 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"sync"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/exp/slices"
-	"golang.org/x/time/rate"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
 
@@ -29,16 +30,14 @@ type Server struct {
 	static fs.FS
 	t      *template.Template
 
-	// gcsReadLimiter rate limits reads from google cloud storage.
-	gcsReadLimiter *rate.Limiter
+	historicalRadarData map[string]*historicalRadarEntry
+}
 
-	// stats is the most recently read bytes of the stats.json file.
-	statsMu sync.Mutex
-	stats   []byte
-
-	// ready is closed when the server is ready to start.
-	ready     chan struct{}
-	readyOnce sync.Once
+type historicalRadarEntry struct {
+	Now      float32 `json:"now"` // unix seconds
+	Aircraft []struct {
+		Flight string `json:"flight"` // flight number or N number
+	} `json:"aircraft"`
 }
 
 type dnsPage struct {
@@ -110,21 +109,66 @@ func (s *Server) dnsChecker(c *gin.Context) {
 	}
 }
 
+type flightEntry struct {
+	Code     string
+	When     string
+	WhenTime time.Time
+}
+
 // aircraftFeed is the endpoint for aircraft data feed.
 func (s *Server) aircraftFeed(c *gin.Context) {
-	// TODO: the web page, an integration test, and caching.
-	//
-	// For now, just display the stats.json file.
-	s.statsMu.Lock()
-	defer s.statsMu.Unlock()
-	if _, err := c.Writer.Write(s.stats); err != nil {
+	// Maybe in the future this should also include live data by connecting to
+	// the raspberry pi through tailscale from the server.
+	var flights []flightEntry
+	for _, v := range s.historicalRadarData {
+		for _, a := range v.Aircraft {
+			if len(a.Flight) == 0 {
+				continue
+			}
+			when := time.Unix(int64(v.Now), 0).UTC()
+			flights = append(flights, flightEntry{
+				Code:     a.Flight,
+				When:     when.Format(time.UnixDate) + " UTC",
+				WhenTime: when,
+			})
+		}
+	}
+	slices.SortFunc[flightEntry](flights, func(a, b flightEntry) bool {
+		return a.WhenTime.After(b.WhenTime)
+	})
+	if err := s.t.Lookup("radar.tmpl").Execute(c.Writer, map[string]any{"Flights": flights}); err != nil {
 		c.Error(err)
+		return
 	}
 }
 
-// RunBackgroundTasks runs tasks until ctx is canceled or an error is
-// encountered. Should be called in a goroutine.
-func (s *Server) RunBackgroundTasks(ctx context.Context) error {
+func (s *Server) SetDump1090DataDirectory(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	m := map[string]*historicalRadarEntry{}
+	for _, e := range entries {
+		if !strings.HasPrefix(e.Name(), "history") {
+			continue
+		}
+		b, err := os.ReadFile(path.Join(dir, e.Name()))
+		if err != nil {
+			return err
+		}
+		entry := &historicalRadarEntry{}
+		if err := json.Unmarshal(b, entry); err != nil {
+			return err
+		}
+		m[e.Name()] = entry
+	}
+	s.historicalRadarData = m
+	log.Printf("Loaded radar data from %v\n", dir)
+	return nil
+}
+
+// DownloadHistoricalDataFromGCS loads historical files from GCS.
+func (s *Server) DownloadHistoricalDataFromGCS(ctx context.Context) error {
 	var options []option.ClientOption
 	// When GOOGLE_APPLICATION_CREDENTIALS_JSON is set, it'll be the JSON
 	// contents of the credentials necessary to authenticate with Google Cloud.
@@ -145,51 +189,49 @@ func (s *Server) RunBackgroundTasks(ctx context.Context) error {
 		return err
 	}
 	defer client.Close()
-	done := ctx.Done()
-	for {
-		select {
-		case <-done:
-			return nil
-		default:
-		}
-		log.Println("Waiting")
-		if err := s.gcsReadLimiter.Wait(ctx); err != nil {
-			return err
-		}
-		log.Println("Downloading stats.json file")
-		b, err := downloadStats(ctx, client)
-		if err != nil {
-			return err
-		}
-		log.Println("Download complete")
-		s.statsMu.Lock()
-		s.stats = b
-		s.statsMu.Unlock()
-		s.readyOnce.Do(func() {
-			close(s.ready)
-		})
+	m, err := loadHistoricalRadarData(ctx, client)
+	if err != nil {
+		return err
 	}
+	s.historicalRadarData = m
+	log.Printf("Loaded radar data from GCS.\n")
+	return nil
 }
 
-// DownloadStats reads the stats.json file from from the given
-// [*storage.Client]. The client should already be authenticated.
-func downloadStats(ctx context.Context, client *storage.Client) ([]byte, error) {
+func loadHistoricalRadarData(ctx context.Context, client *storage.Client) (map[string]*historicalRadarEntry, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	r, err := client.Bucket("dump1090-data").Object("stats.json").NewReader(ctx)
-	if err != nil {
-		return nil, err
+	bucket := client.Bucket("dump1090-data")
+	itr := bucket.Objects(ctx, &storage.Query{
+		Prefix: "history",
+	})
+	m := map[string]*historicalRadarEntry{}
+	for {
+		attrs, err := itr.Next()
+		if err != nil {
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			return nil, err
+		}
+		r, err := bucket.Object(attrs.Name).NewReader(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer r.Close()
+		log.Println("Download", attrs.Name)
+		b, err := io.ReadAll(r)
+		if err != nil {
+			return nil, err
+		}
+		entry := &historicalRadarEntry{}
+		if err := json.Unmarshal(b, entry); err != nil {
+			return nil, err
+		}
+		m[attrs.Name] = entry
 	}
-	defer r.Close()
-	var buf bytes.Buffer
-	if _, err := io.Copy(&buf, r); err != nil {
-		return nil, err
-	}
-	var pretty bytes.Buffer
-	if err := json.Indent(&pretty, buf.Bytes(), "", "  "); err != nil {
-		return nil, err
-	}
-	return pretty.Bytes(), nil
+	log.Println("Download complete")
+	return m, nil
 }
 
 func (s *Server) root(c *gin.Context) {
@@ -204,33 +246,20 @@ func (s *Server) css(c *gin.Context) {
 	c.FileFromFS(c.Params.ByName("path"), http.FS(s.static))
 }
 
-// Ready waits until server initialization is done.
-func (s *Server) Ready(ctx context.Context) error {
-	select {
-	case <-s.ready:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
 // InstallRoutes registers the server's routes on the given [*gin.Engine].
 func InstallRoutes(static fs.FS, engine *gin.Engine, statsRefresh time.Duration) *Server {
-	t, err := template.ParseFS(static, "dnschecker.tmpl", "dnsresult.tmpl")
+	t, err := template.ParseFS(static, "*.tmpl")
 	if err != nil {
 		log.Fatal(err)
 	}
 	s := &Server{
-		static:         static,
-		t:              t,
-		gcsReadLimiter: rate.NewLimiter(rate.Every(statsRefresh), 1),
-		statsMu:        sync.Mutex{},
-		ready:          make(chan struct{}),
+		static: static,
+		t:      t,
 	}
 	engine.GET("/", s.root)
 	engine.GET("/js/:path", s.js)
 	engine.GET("/css/:path", s.css)
 	engine.GET("/dnschecker", s.dnsChecker)
-	engine.GET("/aircraft/feed", s.aircraftFeed)
+	engine.GET("/flights/radar/nyc", s.aircraftFeed)
 	return s
 }
