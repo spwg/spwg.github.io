@@ -133,7 +133,10 @@ func (s *Server) aircraftFeed(c *gin.Context) {
 			})
 		}
 	}
-	slices.SortFunc[flightEntry](flights, func(a, b flightEntry) bool {
+	slices.SortStableFunc[flightEntry](flights, func(a, b flightEntry) bool {
+		if a.WhenTime.Equal(b.WhenTime) {
+			return a.Code > b.Code
+		}
 		return a.WhenTime.After(b.WhenTime)
 	})
 	if err := s.t.Lookup("radar.tmpl").Execute(c.Writer, map[string]any{"Flights": flights}); err != nil {
