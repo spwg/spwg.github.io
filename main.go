@@ -27,6 +27,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spwg/personal-website/internal/handlers"
 	"github.com/unrolled/secure"
+	"golang.org/x/time/rate"
 )
 
 var (
@@ -121,16 +122,18 @@ func main() {
 	}
 	if *downloadHistoricalDataFromGCS {
 		go func() {
-			ticker := time.NewTicker(6 * time.Hour)
-			defer ticker.Stop()
+			l := rate.NewLimiter(rate.Every(6*time.Hour), 1)
 			for {
+				if err := l.Wait(ctx); err != nil {
+					return
+				}
 				select {
-				case <-ticker.C:
-					if err := server.DownloadHistoricalDataFromGCS(ctx); err != nil {
-						log.Fatal(err)
-					}
 				case <-ctx.Done():
 					return
+				default:
+				}
+				if err := server.DownloadHistoricalDataFromGCS(ctx); err != nil {
+					log.Fatal(err)
 				}
 			}
 		}()
