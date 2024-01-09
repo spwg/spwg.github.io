@@ -31,13 +31,17 @@ type Server struct {
 	t      *template.Template
 
 	historicalRadarData map[string]*historicalRadarEntry
+	allFlights          []aircraft
+}
+
+type aircraft struct {
+	Flight string `json:"flight"` // flight number or N number
+	When   int64  `json:"when"`   // unix seconds
 }
 
 type historicalRadarEntry struct {
-	Now      float32 `json:"now"` // unix seconds
-	Aircraft []struct {
-		Flight string `json:"flight"` // flight number or N number
-	} `json:"aircraft"`
+	Now      float32    `json:"now"` // unix seconds
+	Aircraft []aircraft `json:"aircraft"`
 }
 
 type dnsPage struct {
@@ -146,6 +150,17 @@ func (s *Server) aircraftFeed(c *gin.Context) {
 }
 
 func (s *Server) SetDump1090DataDirectory(dir string) error {
+	allAircraftPath := path.Join(dir, "all_aircraft.json")
+	b, err := os.ReadFile(allAircraftPath)
+	if err != nil {
+		return err
+	}
+	var a []aircraft
+	if err := json.Unmarshal(b, &a); err != nil {
+		return err
+	}
+	s.allFlights = a
+	log.Printf("Loaded all aircraft from %v\n", allAircraftPath)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -172,21 +187,11 @@ func (s *Server) SetDump1090DataDirectory(dir string) error {
 
 // DownloadHistoricalDataFromGCS loads historical files from GCS.
 func (s *Server) DownloadHistoricalDataFromGCS(ctx context.Context) error {
-	var options []option.ClientOption
 	// When GOOGLE_APPLICATION_CREDENTIALS_JSON is set, it'll be the JSON
 	// contents of the credentials necessary to authenticate with Google Cloud.
 	// This is currently configured with Fly Secrets, which are available to the
 	// server at run time only. Docs: https://fly.io/docs/reference/secrets/.
-	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") != "" {
-		log.Println("Using credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON")
-		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))))
-	} else if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
-		// TODO: delete this branch after removing the secret and verifying a release is using the other branch.
-		log.Println("Using credentials from GOOGLE_APPLICATION_CREDENTIALS.")
-		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))))
-	} else {
-		log.Println("No credentials found in environment variables.")
-	}
+	options := gcsClientOptions()
 	client, err := storage.NewClient(ctx, options...)
 	if err != nil {
 		return err
@@ -199,6 +204,57 @@ func (s *Server) DownloadHistoricalDataFromGCS(ctx context.Context) error {
 	s.historicalRadarData = m
 	log.Printf("Loaded radar data from GCS.\n")
 	return nil
+}
+
+func (s *Server) DownloadAllAircraftFileFromGCS(ctx context.Context) error {
+	options := gcsClientOptions()
+	client, err := storage.NewClient(ctx, options...)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	defer client.Close()
+	a, err := loadAllAircraftFile(ctx, client)
+	if err != nil {
+		return err
+	}
+	s.allFlights = a
+	return nil
+}
+
+func gcsClientOptions() []option.ClientOption {
+	var options []option.ClientOption
+	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") != "" {
+		log.Println("Using credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON")
+		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))))
+	} else if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
+		// TODO: delete this branch after removing the secret and verifying a release is using the other branch.
+		log.Println("Using credentials from GOOGLE_APPLICATION_CREDENTIALS.")
+		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))))
+	} else {
+		log.Println("No credentials found in environment variables.")
+	}
+	return options
+}
+
+func loadAllAircraftFile(ctx context.Context, client *storage.Client) ([]aircraft, error) {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	bucket := client.Bucket("dump1090-data")
+	r, err := bucket.Object("all_aircraft.json").NewReader(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	var a []aircraft
+	if err := json.Unmarshal(b, &a); err != nil {
+		return nil, err
+	}
+	return a, nil
 }
 
 func loadHistoricalRadarData(ctx context.Context, client *storage.Client) (map[string]*historicalRadarEntry, error) {
