@@ -132,7 +132,7 @@ func (s *Server) aircraftFeed(c *gin.Context) {
 			when := time.Unix(int64(v.Now), 0).UTC()
 			flights = append(flights, flightEntry{
 				Code:     a.Flight,
-				When:     when.Format(time.UnixDate) + " UTC",
+				When:     when.Format(time.UnixDate),
 				WhenTime: when,
 			})
 		}
