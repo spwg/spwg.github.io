@@ -122,7 +122,7 @@ func main() {
 	}
 	if *downloadHistoricalDataFromGCS {
 		go func() {
-			l := rate.NewLimiter(rate.Every(6*time.Hour), 1)
+			l := rate.NewLimiter(rate.Every(time.Hour), 1)
 			for {
 				if err := l.Wait(ctx); err != nil {
 					return
