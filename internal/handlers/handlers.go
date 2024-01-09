@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -35,8 +34,8 @@ type Server struct {
 }
 
 type aircraft struct {
-	Flight string `json:"flight"` // flight number or N number
-	When   int64  `json:"when"`   // unix seconds
+	Flight string `json:"code"` // flight number or N number
+	When   int64  `json:"when"` // unix seconds
 }
 
 type historicalRadarEntry struct {
@@ -121,29 +120,11 @@ type flightEntry struct {
 
 // aircraftFeed is the endpoint for aircraft data feed.
 func (s *Server) aircraftFeed(c *gin.Context) {
-	// Maybe in the future this should also include live data by connecting to
-	// the raspberry pi through tailscale from the server.
-	var flights []flightEntry
-	for _, v := range s.historicalRadarData {
-		for _, a := range v.Aircraft {
-			if len(a.Flight) == 0 {
-				continue
-			}
-			when := time.Unix(int64(v.Now), 0).UTC()
-			flights = append(flights, flightEntry{
-				Code:     a.Flight,
-				When:     when.Format(time.UnixDate),
-				WhenTime: when,
-			})
-		}
+	entries := make([]flightEntry, 0, len(s.allFlights))
+	for _, v := range s.allFlights {
+		entries = append(entries, flightEntry{Code: v.Flight, When: time.Unix(v.When, 0).UTC().Format(time.ANSIC)})
 	}
-	slices.SortStableFunc(flights, func(a, b flightEntry) bool {
-		if a.WhenTime.Equal(b.WhenTime) {
-			return a.Code > b.Code
-		}
-		return a.WhenTime.After(b.WhenTime)
-	})
-	if err := s.t.Lookup("radar.tmpl").Execute(c.Writer, map[string]any{"Flights": flights}); err != nil {
+	if err := s.t.Lookup("radar.tmpl").Execute(c.Writer, map[string]any{"Flights": entries}); err != nil {
 		c.Error(err)
 		return
 	}
@@ -155,34 +136,22 @@ func (s *Server) SetDump1090DataDirectory(dir string) error {
 	if err != nil {
 		return err
 	}
-	var a []aircraft
-	if err := json.Unmarshal(b, &a); err != nil {
+	var flights []aircraft
+	if err := json.Unmarshal(b, &flights); err != nil {
 		return err
 	}
-	s.allFlights = a
+	// Sort to keep the data deterministic.
+	slices.SortStableFunc(flights, sortAircraft)
+	s.allFlights = flights
 	log.Printf("Loaded all aircraft from %v\n", allAircraftPath)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	m := map[string]*historicalRadarEntry{}
-	for _, e := range entries {
-		if !strings.HasPrefix(e.Name(), "history") {
-			continue
-		}
-		b, err := os.ReadFile(path.Join(dir, e.Name()))
-		if err != nil {
-			return err
-		}
-		entry := &historicalRadarEntry{}
-		if err := json.Unmarshal(b, entry); err != nil {
-			return err
-		}
-		m[e.Name()] = entry
-	}
-	s.historicalRadarData = m
-	log.Printf("Loaded radar data from %v\n", dir)
 	return nil
+}
+
+func sortAircraft(a, b aircraft) bool {
+	if a.When == b.When {
+		return a.Flight < b.Flight
+	}
+	return a.When < b.When
 }
 
 // DownloadHistoricalDataFromGCS loads historical files from GCS.
@@ -214,11 +183,14 @@ func (s *Server) DownloadAllAircraftFileFromGCS(ctx context.Context) error {
 	}
 	defer client.Close()
 	defer client.Close()
-	a, err := loadAllAircraftFile(ctx, client)
+	flights, err := loadAllAircraftFile(ctx, client)
 	if err != nil {
 		return err
 	}
-	s.allFlights = a
+	// Sort to keep the data deterministic.
+	slices.SortStableFunc(flights, sortAircraft)
+	s.allFlights = flights
+	log.Printf("Loaded all aircraft from GCS.\n")
 	return nil
 }
 

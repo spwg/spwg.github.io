@@ -132,9 +132,6 @@ func main() {
 					return
 				default:
 				}
-				if err := server.DownloadHistoricalDataFromGCS(ctx); err != nil {
-					log.Fatal(err)
-				}
 				if err := server.DownloadAllAircraftFileFromGCS(ctx); err != nil {
 					log.Fatal(err)
 				}
