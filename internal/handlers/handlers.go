@@ -133,7 +133,7 @@ func (s *Server) aircraftFeed(c *gin.Context) {
 			})
 		}
 	}
-	slices.SortStableFunc[flightEntry](flights, func(a, b flightEntry) bool {
+	slices.SortStableFunc(flights, func(a, b flightEntry) bool {
 		if a.WhenTime.Equal(b.WhenTime) {
 			return a.Code > b.Code
 		}
