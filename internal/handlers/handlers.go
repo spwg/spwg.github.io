@@ -30,17 +30,12 @@ type Server struct {
 	t      *template.Template
 
 	historicalRadarData map[string]*historicalRadarEntry
-	allFlights          []aircraft
-}
-
-type aircraft struct {
-	Flight string `json:"code"` // flight number or N number
-	When   int64  `json:"when"` // unix seconds
+	allFlights          []*flightEntry
 }
 
 type historicalRadarEntry struct {
-	Now      float32    `json:"now"` // unix seconds
-	Aircraft []aircraft `json:"aircraft"`
+	Now      float32       `json:"now"` // unix seconds
+	Aircraft []flightEntry `json:"aircraft"`
 }
 
 type dnsPage struct {
@@ -113,18 +108,15 @@ func (s *Server) dnsChecker(c *gin.Context) {
 }
 
 type flightEntry struct {
-	Code     string
+	Code     string `json:"code"`
+	WhenUnix int64  `json:"when"`
 	When     string
 	WhenTime time.Time
 }
 
 // aircraftFeed is the endpoint for aircraft data feed.
 func (s *Server) aircraftFeed(c *gin.Context) {
-	entries := make([]flightEntry, 0, len(s.allFlights))
-	for _, v := range s.allFlights {
-		entries = append(entries, flightEntry{Code: v.Flight, When: time.Unix(v.When, 0).UTC().Format(time.ANSIC)})
-	}
-	if err := s.t.Lookup("radar.tmpl").Execute(c.Writer, map[string]any{"Flights": entries}); err != nil {
+	if err := s.t.Lookup("radar.tmpl").Execute(c.Writer, map[string]any{"Flights": s.allFlights}); err != nil {
 		c.Error(err)
 		return
 	}
@@ -136,22 +128,34 @@ func (s *Server) SetDump1090DataDirectory(dir string) error {
 	if err != nil {
 		return err
 	}
-	var flights []aircraft
-	if err := json.Unmarshal(b, &flights); err != nil {
+	flights, err := unmarshalJSONAllAircraft(b)
+	if err != nil {
 		return err
 	}
-	// Sort to keep the data deterministic.
-	slices.SortStableFunc(flights, sortAircraft)
 	s.allFlights = flights
 	log.Printf("Loaded all aircraft from %v\n", allAircraftPath)
 	return nil
 }
 
-func sortAircraft(a, b aircraft) bool {
-	if a.When == b.When {
-		return a.Flight < b.Flight
+func unmarshalJSONAllAircraft(b []byte) ([]*flightEntry, error) {
+	var flights []*flightEntry
+	if err := json.Unmarshal(b, &flights); err != nil {
+		return nil, err
 	}
-	return a.When < b.When
+	for _, a := range flights {
+		a.WhenTime = time.Unix(a.WhenUnix, 0).UTC()
+		a.When = a.WhenTime.Format(time.ANSIC)
+	}
+	// Sort to keep the data deterministic.
+	slices.SortStableFunc(flights, sortAircraft)
+	return flights, nil
+}
+
+func sortAircraft(a, b *flightEntry) bool {
+	if a.WhenTime.Equal(b.WhenTime) {
+		return a.Code > b.Code
+	}
+	return a.WhenTime.After(b.WhenTime)
 }
 
 // DownloadHistoricalDataFromGCS loads historical files from GCS.
@@ -187,8 +191,6 @@ func (s *Server) DownloadAllAircraftFileFromGCS(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Sort to keep the data deterministic.
-	slices.SortStableFunc(flights, sortAircraft)
 	s.allFlights = flights
 	log.Printf("Loaded all aircraft from GCS.\n")
 	return nil
@@ -209,7 +211,7 @@ func gcsClientOptions() []option.ClientOption {
 	return options
 }
 
-func loadAllAircraftFile(ctx context.Context, client *storage.Client) ([]aircraft, error) {
+func loadAllAircraftFile(ctx context.Context, client *storage.Client) ([]*flightEntry, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	bucket := client.Bucket("dump1090-data")
@@ -222,11 +224,7 @@ func loadAllAircraftFile(ctx context.Context, client *storage.Client) ([]aircraf
 	if err != nil {
 		return nil, err
 	}
-	var a []aircraft
-	if err := json.Unmarshal(b, &a); err != nil {
-		return nil, err
-	}
-	return a, nil
+	return unmarshalJSONAllAircraft(b)
 }
 
 func loadHistoricalRadarData(ctx context.Context, client *storage.Client) (map[string]*historicalRadarEntry, error) {
