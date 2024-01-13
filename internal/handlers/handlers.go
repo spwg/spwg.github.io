@@ -4,6 +4,7 @@ package handlers
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -132,9 +133,34 @@ func (s *Server) SetDump1090DataDirectory(dir string) error {
 	if err != nil {
 		return err
 	}
-	s.allFlights = flights
+	s.allFlights = mostRecentTimestamps(flights)
 	log.Printf("Loaded all aircraft from %v\n", allAircraftPath)
 	return nil
+}
+
+// MostRecentTimestamps creates a new slices of flight entries that contains
+// only 1 entry per flight code in the input flights.
+//
+// The returned slice will be sorted by timestamp (most recent first).
+func mostRecentTimestamps(flights []*flightEntry) []*flightEntry {
+	if len(flights) == 0 {
+		return nil
+	}
+	slices.SortStableFunc(flights, func(a, b *flightEntry) bool {
+		x := or(cmp.Compare(a.Code, b.Code), cmp.Compare(a.WhenUnix, b.WhenUnix))
+		return x < 0
+	})
+	filtered := []*flightEntry{flights[0]}
+	for _, f := range flights[1:] {
+		if filtered[len(filtered)-1].Code == f.Code {
+			continue
+		}
+		filtered = append(filtered, f)
+	}
+	slices.SortStableFunc(filtered, func(a, b *flightEntry) bool {
+		return !cmp.Less(a.WhenUnix, b.WhenUnix)
+	})
+	return filtered
 }
 
 func unmarshalJSONAllAircraft(b []byte) ([]*flightEntry, error) {
@@ -142,20 +168,15 @@ func unmarshalJSONAllAircraft(b []byte) ([]*flightEntry, error) {
 	if err := json.Unmarshal(b, &flights); err != nil {
 		return nil, err
 	}
+	nyc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		return nil, err
+	}
 	for _, a := range flights {
-		a.WhenTime = time.Unix(a.WhenUnix, 0).UTC()
-		a.When = a.WhenTime.Format(time.ANSIC)
+		a.WhenTime = time.Unix(a.WhenUnix, 0).In(nyc)
+		a.When = a.WhenTime.Format(time.UnixDate)
 	}
-	// Sort to keep the data deterministic.
-	slices.SortStableFunc(flights, sortAircraft)
 	return flights, nil
-}
-
-func sortAircraft(a, b *flightEntry) bool {
-	if a.WhenTime.Equal(b.WhenTime) {
-		return a.Code > b.Code
-	}
-	return a.WhenTime.After(b.WhenTime)
 }
 
 // DownloadHistoricalDataFromGCS loads historical files from GCS.
@@ -186,12 +207,11 @@ func (s *Server) DownloadAllAircraftFileFromGCS(ctx context.Context) error {
 		return err
 	}
 	defer client.Close()
-	defer client.Close()
 	flights, err := loadAllAircraftFile(ctx, client)
 	if err != nil {
 		return err
 	}
-	s.allFlights = flights
+	s.allFlights = mostRecentTimestamps(flights)
 	log.Printf("Loaded all aircraft from GCS.\n")
 	return nil
 }
@@ -273,6 +293,16 @@ func (s *Server) js(c *gin.Context) {
 
 func (s *Server) css(c *gin.Context) {
 	c.FileFromFS(c.Params.ByName("path"), http.FS(s.static))
+}
+
+func or[T cmp.Ordered](args ...T) T {
+	var zero T
+	for _, a := range args {
+		if a != zero {
+			return a
+		}
+	}
+	return zero
 }
 
 // InstallRoutes registers the server's routes on the given [*gin.Engine].
