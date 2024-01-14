@@ -81,8 +81,7 @@ func installMiddleware(r *gin.Engine) error {
 	return nil
 }
 
-func main() {
-	ctx := context.Background()
+func run(ctx context.Context) error {
 	log.SetFlags(log.Flags() | log.Lshortfile | log.Lmicroseconds)
 	flag.Parse()
 	if os.Getenv("SENTRY_DSN") != "" {
@@ -92,7 +91,7 @@ func main() {
 			TracesSampleRate: 1.0,
 		}
 		if err := sentry.Init(options); err != nil {
-			log.Fatalf("sentry.Init: %s", err)
+			return fmt.Errorf("sentry.Init: %v", err)
 		}
 		defer sentry.Flush(2 * time.Second)
 	}
@@ -112,12 +111,12 @@ func main() {
 	installMiddleware(engine)
 	staticFS, err := fs.Sub(embeddedStatic, "static")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	server := handlers.InstallRoutes(staticFS, engine, *gcsReadRate)
 	if *useDataDirectory && !*downloadHistoricalDataFromGCS {
 		if err := server.SetDump1090DataDirectory(*dump1090DataDirectory); err != nil {
-			log.Fatal(err)
+			return err
 		}
 	}
 	if *downloadHistoricalDataFromGCS {
@@ -144,6 +143,14 @@ func main() {
 	}
 	log.Printf("Listening on %v\n", net.JoinHostPort(host, port))
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+func main() {
+	ctx := context.Background()
+	if err := run(ctx); err != nil {
 		log.Fatal(err)
 	}
 }
