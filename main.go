@@ -42,7 +42,7 @@ var (
 		"Frequency at which to read from google cloud storage.")
 	downloadHistoricalDataFromGCS = flag.Bool("download_historical_data_from_gcs", os.Getenv("FLY_APP_NAME") != "",
 		"Enable background tasks such as reading from GCS.")
-	dump1090DataDirectory = flag.String("dump1090_data_directory", "/tmp/dump1090-data",
+	dump1090DataDirectory = flag.String("dump1090_data_directory", ".",
 		"If in dev, read from this directory instead of GCS.")
 	useDataDirectory = flag.Bool("use_data_directory", os.Getenv("FLY_APP_NAME") == "", "")
 )
