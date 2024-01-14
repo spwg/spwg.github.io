@@ -11,7 +11,6 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +19,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/glog"
 	"golang.org/x/exp/slices"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -57,7 +57,7 @@ func (s *Server) dnsChecker(c *gin.Context) {
 	}
 	lookupHostResponse, err := net.DefaultResolver.LookupHost(ctx, h)
 	if err != nil {
-		log.Print(err)
+		glog.Info(err)
 		switch err.(type) {
 		case *net.DNSError:
 		default:
@@ -68,7 +68,7 @@ func (s *Server) dnsChecker(c *gin.Context) {
 	slices.Sort(lookupHostResponse)
 	lookupNSResponse, err := net.DefaultResolver.LookupNS(ctx, h)
 	if err != nil {
-		log.Print(err)
+		glog.Info(err)
 		switch err.(type) {
 		case *net.DNSError:
 		default:
@@ -104,7 +104,7 @@ func (s *Server) dnsChecker(c *gin.Context) {
 		return
 	}
 	if _, err := c.Writer.Write(b.Bytes()); err != nil {
-		log.Print(err)
+		glog.Info(err)
 	}
 }
 
@@ -134,7 +134,7 @@ func (s *Server) SetDump1090DataDirectory(dir string) error {
 		return err
 	}
 	s.allFlights = mostRecentTimestamps(flights)
-	log.Printf("Loaded all aircraft from %v\n", allAircraftPath)
+	glog.Infof("Loaded all aircraft from %v\n", allAircraftPath)
 	return nil
 }
 
@@ -196,7 +196,7 @@ func (s *Server) DownloadHistoricalDataFromGCS(ctx context.Context) error {
 		return err
 	}
 	s.historicalRadarData = m
-	log.Printf("Loaded radar data from GCS.\n")
+	glog.Infof("Loaded radar data from GCS.\n")
 	return nil
 }
 
@@ -212,21 +212,21 @@ func (s *Server) DownloadAllAircraftFileFromGCS(ctx context.Context) error {
 		return err
 	}
 	s.allFlights = mostRecentTimestamps(flights)
-	log.Printf("Loaded all aircraft from GCS.\n")
+	glog.Infof("Loaded all aircraft from GCS.\n")
 	return nil
 }
 
 func gcsClientOptions() []option.ClientOption {
 	var options []option.ClientOption
 	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") != "" {
-		log.Println("Using credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON")
+		glog.Infoln("Using credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON")
 		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))))
 	} else if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
 		// TODO: delete this branch after removing the secret and verifying a release is using the other branch.
-		log.Println("Using credentials from GOOGLE_APPLICATION_CREDENTIALS.")
+		glog.Infoln("Using credentials from GOOGLE_APPLICATION_CREDENTIALS.")
 		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))))
 	} else {
-		log.Println("No credentials found in environment variables.")
+		glog.Infoln("No credentials found in environment variables.")
 	}
 	return options
 }
@@ -268,7 +268,7 @@ func loadHistoricalRadarData(ctx context.Context, client *storage.Client) (map[s
 			return nil, err
 		}
 		defer r.Close()
-		log.Println("Download", attrs.Name)
+		glog.Infoln("Download", attrs.Name)
 		b, err := io.ReadAll(r)
 		if err != nil {
 			return nil, err
@@ -279,7 +279,7 @@ func loadHistoricalRadarData(ctx context.Context, client *storage.Client) (map[s
 		}
 		m[attrs.Name] = entry
 	}
-	log.Println("Download complete")
+	glog.Infoln("Download complete")
 	return m, nil
 }
 
@@ -309,7 +309,7 @@ func or[T cmp.Ordered](args ...T) T {
 func InstallRoutes(static fs.FS, engine *gin.Engine, statsRefresh time.Duration) *Server {
 	t, err := template.ParseFS(static, "*.tmpl")
 	if err != nil {
-		log.Fatal(err)
+		glog.Fatal(err)
 	}
 	s := &Server{
 		static: static,

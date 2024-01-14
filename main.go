@@ -16,7 +16,6 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -25,6 +24,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/glog"
 	"github.com/spwg/personal-website/internal/handlers"
 	"github.com/unrolled/secure"
 	"golang.org/x/time/rate"
@@ -82,10 +82,9 @@ func installMiddleware(r *gin.Engine) error {
 }
 
 func run(ctx context.Context) error {
-	log.SetFlags(log.Flags() | log.Lshortfile | log.Lmicroseconds)
-	flag.Parse()
+	defer glog.Flush()
 	if os.Getenv("SENTRY_DSN") != "" {
-		log.Printf("Initializing Sentry")
+		glog.Infof("Initializing Sentry")
 		options := sentry.ClientOptions{
 			Dsn:              os.Getenv("SENTRY_DSN"),
 			TracesSampleRate: 1.0,
@@ -101,7 +100,7 @@ func run(ctx context.Context) error {
 	}
 	var host string
 	if os.Getenv("FLY_APP_NAME") != "" {
-		log.Printf("Running in the fly.io runtime.")
+		glog.Infof("Running in the fly.io runtime.")
 		gin.SetMode(gin.ReleaseMode)
 		host = "::"
 	} else {
@@ -132,7 +131,7 @@ func run(ctx context.Context) error {
 				default:
 				}
 				if err := server.DownloadAllAircraftFileFromGCS(ctx); err != nil {
-					log.Fatal(err)
+					glog.Fatal(err)
 				}
 			}
 		}()
@@ -141,7 +140,7 @@ func run(ctx context.Context) error {
 		Addr:    net.JoinHostPort(host, port),
 		Handler: engine,
 	}
-	log.Printf("Listening on %v\n", net.JoinHostPort(host, port))
+	glog.Infof("Listening on %v\n", net.JoinHostPort(host, port))
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
@@ -150,7 +149,11 @@ func run(ctx context.Context) error {
 
 func main() {
 	ctx := context.Background()
+	flag.Parse()
+	if err := flag.Set("alsologtostderr", "true"); err != nil {
+		glog.Fatal(err)
+	}
 	if err := run(ctx); err != nil {
-		log.Fatal(err)
+		glog.Fatal(err)
 	}
 }
