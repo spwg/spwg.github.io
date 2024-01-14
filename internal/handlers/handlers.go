@@ -218,15 +218,11 @@ func (s *Server) DownloadAllAircraftFileFromGCS(ctx context.Context) error {
 
 func gcsClientOptions() []option.ClientOption {
 	var options []option.ClientOption
-	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") != "" {
-		glog.Infoln("Using credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON")
-		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))))
-	} else if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
-		// TODO: delete this branch after removing the secret and verifying a release is using the other branch.
+	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
 		glog.Infoln("Using credentials from GOOGLE_APPLICATION_CREDENTIALS.")
 		options = append(options, option.WithCredentialsJSON([]byte(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))))
 	} else {
-		glog.Infoln("No credentials found in environment variables.")
+		glog.Infoln("No credentials found in environment variables, this is fine in local dev.")
 	}
 	return options
 }
