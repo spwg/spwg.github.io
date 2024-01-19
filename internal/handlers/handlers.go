@@ -15,12 +15,14 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 	"golang.org/x/exp/slices"
+	"golang.org/x/time/rate"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -147,28 +149,38 @@ func (s *Server) DownloadAllAircraftFileFromGCS(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) LoadMostRecentAircraftFromFlyPostgres(ctx context.Context, db *sql.DB, limit int) error {
-	rows, err := db.Query("select distinct(flight_designator), max(seen_time) as most_recently_seen from flights group by flight_designator order by most_recently_seen desc limit $1;", limit)
-	if err != nil {
-		return fmt.Errorf("loading most recent aircraft from fly postgres: query: %v", err)
-	}
-	defer rows.Close()
-	var allFlights []*flightEntry
-	for rows.Next() {
-		var code string
-		var seen time.Time
-		if err := rows.Scan(&code, &seen); err != nil {
-			return fmt.Errorf("loading most recent aircraft from fly postgres: scan: %v", err)
+func (s *Server) LoadMostRecentAircraftFromFlyPostgres(ctx context.Context, db *sql.DB, reloadLimit *rate.Limiter, limit int) error {
+	for {
+		if err := reloadLimit.Wait(ctx); err != nil {
+			return err
 		}
-		allFlights = append(allFlights, &flightEntry{
-			Code:     code,
-			WhenUnix: seen.Unix(),
-			When:     seen.Format(time.ANSIC),
-			WhenTime: seen,
-		})
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		rows, err := db.Query("select distinct(flight_designator), max(seen_time) as most_recently_seen from flights group by flight_designator order by most_recently_seen desc limit $1;", limit)
+		if err != nil {
+			return fmt.Errorf("loading most recent aircraft from fly postgres: query: %v", err)
+		}
+		defer rows.Close()
+		var allFlights []*flightEntry
+		for rows.Next() {
+			var code string
+			var seen time.Time
+			if err := rows.Scan(&code, &seen); err != nil {
+				return fmt.Errorf("loading most recent aircraft from fly postgres: scan: %v", err)
+			}
+			code = strings.TrimSpace(code)
+			allFlights = append(allFlights, &flightEntry{
+				Code:     code,
+				WhenUnix: seen.Unix(),
+				When:     seen.Format(time.ANSIC),
+				WhenTime: seen,
+			})
+		}
+		s.allFlights = allFlights
 	}
-	s.allFlights = allFlights
-	return nil
 }
 
 func gcsClientOptions() []option.ClientOption {

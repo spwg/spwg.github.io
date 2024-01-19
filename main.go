@@ -106,27 +106,17 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	db, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return err
+	}
 	server := handlers.InstallRoutes(staticFS, engine)
 	go func() {
-		l := rate.NewLimiter(rate.Every(2*time.Minute), 1)
-		for {
-			if err := l.Wait(ctx); err != nil {
-				return
-			}
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			db, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
-			if err != nil {
-				glog.Fatal(err)
-			}
-			defer db.Close()
-			rowLimit := 100
-			if err := server.LoadMostRecentAircraftFromFlyPostgres(ctx, db, rowLimit); err != nil {
-				glog.Fatal(err)
-			}
+		reloadLimit := rate.NewLimiter(rate.Every(2*time.Minute), 1)
+		defer db.Close()
+		rowLimit := 100
+		if err := server.LoadMostRecentAircraftFromFlyPostgres(ctx, db, reloadLimit, rowLimit); err != nil {
+			glog.Fatal(err)
 		}
 	}()
 	srv := &http.Server{
