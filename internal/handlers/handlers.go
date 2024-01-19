@@ -5,8 +5,10 @@ package handlers
 import (
 	"cmp"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
@@ -145,6 +147,30 @@ func (s *Server) DownloadAllAircraftFileFromGCS(ctx context.Context) error {
 	return nil
 }
 
+func (s *Server) LoadMostRecentAircraftFromFlyPostgres(ctx context.Context, db *sql.DB, limit int) error {
+	rows, err := db.Query("select distinct(flight_designator), max(seen_time) as most_recently_seen from flights group by flight_designator order by most_recently_seen desc limit $1;", limit)
+	if err != nil {
+		return fmt.Errorf("loading most recent aircraft from fly postgres: query: %v", err)
+	}
+	defer rows.Close()
+	var allFlights []*flightEntry
+	for rows.Next() {
+		var code string
+		var seen time.Time
+		if err := rows.Scan(&code, &seen); err != nil {
+			return fmt.Errorf("loading most recent aircraft from fly postgres: scan: %v", err)
+		}
+		allFlights = append(allFlights, &flightEntry{
+			Code:     code,
+			WhenUnix: seen.Unix(),
+			When:     seen.Format(time.ANSIC),
+			WhenTime: seen,
+		})
+	}
+	s.allFlights = allFlights
+	return nil
+}
+
 func gcsClientOptions() []option.ClientOption {
 	var options []option.ClientOption
 	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
@@ -231,7 +257,7 @@ func or[T cmp.Ordered](args ...T) T {
 }
 
 // InstallRoutes registers the server's routes on the given [*gin.Engine].
-func InstallRoutes(static fs.FS, engine *gin.Engine, statsRefresh time.Duration) *Server {
+func InstallRoutes(static fs.FS, engine *gin.Engine) *Server {
 	t, err := template.ParseFS(static, "*.tmpl")
 	if err != nil {
 		glog.Fatal(err)

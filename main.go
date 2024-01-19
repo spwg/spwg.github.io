@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"errors"
 	"flag"
@@ -25,6 +26,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
+	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/spwg/personal-website/internal/handlers"
 	"github.com/unrolled/secure"
 	"golang.org/x/time/rate"
@@ -37,14 +39,6 @@ var (
 	cloudflareIPv6Addresses string
 	//go:embed static/*
 	embeddedStatic embed.FS
-
-	gcsReadRate = flag.Duration("gcs_read_rate", 6*time.Hour,
-		"Frequency at which to read from google cloud storage.")
-	downloadHistoricalDataFromGCS = flag.Bool("download_historical_data_from_gcs", os.Getenv("FLY_APP_NAME") != "",
-		"Enable background tasks such as reading from GCS.")
-	dump1090DataDirectory = flag.String("dump1090_data_directory", ".",
-		"If in dev, read from this directory instead of GCS.")
-	useDataDirectory = flag.Bool("use_data_directory", os.Getenv("FLY_APP_NAME") == "", "")
 )
 
 // installMiddleware sets up logging and recovery first so that the logging
@@ -112,30 +106,29 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	server := handlers.InstallRoutes(staticFS, engine, *gcsReadRate)
-	if *useDataDirectory && !*downloadHistoricalDataFromGCS {
-		if err := server.SetDump1090DataDirectory(*dump1090DataDirectory); err != nil {
-			return err
-		}
-	}
-	if *downloadHistoricalDataFromGCS {
-		go func() {
-			l := rate.NewLimiter(rate.Every(time.Hour), 1)
-			for {
-				if err := l.Wait(ctx); err != nil {
-					return
-				}
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-				if err := server.DownloadAllAircraftFileFromGCS(ctx); err != nil {
-					glog.Fatal(err)
-				}
+	server := handlers.InstallRoutes(staticFS, engine)
+	go func() {
+		l := rate.NewLimiter(rate.Every(2*time.Minute), 1)
+		for {
+			if err := l.Wait(ctx); err != nil {
+				return
 			}
-		}()
-	}
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			db, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
+			if err != nil {
+				glog.Fatal(err)
+			}
+			defer db.Close()
+			rowLimit := 100
+			if err := server.LoadMostRecentAircraftFromFlyPostgres(ctx, db, rowLimit); err != nil {
+				glog.Fatal(err)
+			}
+		}
+	}()
 	srv := &http.Server{
 		Addr:    net.JoinHostPort(host, port),
 		Handler: engine,
