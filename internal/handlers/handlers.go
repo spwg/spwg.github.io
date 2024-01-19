@@ -72,6 +72,7 @@ func (s *Server) LoadMostRecentAircraftFromFlyPostgres(ctx context.Context, db *
 			})
 		}
 		s.allFlights = flights
+		glog.Infof("Loaded most recent flights.")
 	}
 }
 

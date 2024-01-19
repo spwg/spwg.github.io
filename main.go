@@ -106,10 +106,12 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	glog.Infof("Connecting to the database.")
 	db, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
 	if err != nil {
 		return err
 	}
+	glog.Infof("Connected to the database.")
 	server := handlers.InstallRoutes(staticFS, engine)
 	go func() {
 		reloadLimit := rate.NewLimiter(rate.Every(2*time.Minute), 1)
