@@ -112,15 +112,9 @@ func run(ctx context.Context) error {
 		return err
 	}
 	glog.Infof("Connected to the database.")
-	server := handlers.InstallRoutes(staticFS, engine)
-	go func() {
-		reloadLimit := rate.NewLimiter(rate.Every(2*time.Minute), 1)
-		defer db.Close()
-		rowLimit := 100
-		if err := server.LoadMostRecentAircraftFromFlyPostgres(ctx, db, reloadLimit, rowLimit); err != nil {
-			glog.Fatal(err)
-		}
-	}()
+	reloadLimit := rate.NewLimiter(rate.Every(2*time.Minute), 1)
+	rowLimit := 100
+	_ = handlers.InstallRoutes(staticFS, engine, db, reloadLimit, rowLimit)
 	srv := &http.Server{
 		Addr:    net.JoinHostPort(host, port),
 		Handler: engine,
