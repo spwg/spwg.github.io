@@ -19,6 +19,14 @@ import (
 	"golang.org/x/time/rate"
 )
 
+var nycTZ = func() *time.Location {
+	l, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		panic(err)
+	}
+	return l
+}()
+
 // Server holds a collection of service endpoints.
 type Server struct {
 	static fs.FS
@@ -68,11 +76,12 @@ func (s *Server) loadMostRecentAircraftFromFlyPostgres(ctx context.Context) erro
 		if err := rows.Scan(&code, &seen); err != nil {
 			return fmt.Errorf("loading most recent aircraft from fly postgres: scan: %v", err)
 		}
+		seen = seen.In(nycTZ)
 		code = strings.TrimSpace(code)
 		flights = append(flights, &flightEntry{
 			Code:     code,
 			WhenUnix: seen.Unix(),
-			When:     seen.Format(time.ANSIC),
+			When:     seen.Format("Jan 02, 2006 03:04:05 PM EST"),
 			WhenTime: seen,
 		})
 	}
