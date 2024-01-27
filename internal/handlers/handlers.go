@@ -19,13 +19,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var nycTZ = func() *time.Location {
-	l, err := time.LoadLocation("America/New_York")
-	if err != nil {
-		panic(err)
-	}
-	return l
-}()
+var nycTZ = mustLoadLocation("America/New_York")
 
 // Server holds a collection of service endpoints.
 type Server struct {
@@ -122,4 +116,12 @@ func InstallRoutes(static fs.FS, engine *gin.Engine, db *sql.DB, reloadLimit *ra
 	engine.GET("/css/:path", s.css)
 	engine.GET("/flights/radar/nyc", s.aircraftFeed)
 	return s
+}
+
+func mustLoadLocation(name string) *time.Location {
+	l, err := time.LoadLocation(name)
+	if err != nil {
+		panic(err)
+	}
+	return l
 }
