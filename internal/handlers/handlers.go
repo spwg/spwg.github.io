@@ -79,6 +79,9 @@ func (s *Server) loadMostRecentAircraftFromFlyPostgres(ctx context.Context) erro
 			WhenTime: seen,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	s.allFlightsMu.Lock()
 	s.allFlights = flights
 	s.allFlightsMu.Unlock()
