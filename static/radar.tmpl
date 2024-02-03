@@ -14,7 +14,7 @@
 </tr>
 {{range .Flights}}
 <tr>
-<td>{{.Code}}</td>
+<td><a href="https://flightaware.com/live/flight/{{.Code}}">{{.Code}}</a></td>
 <td>{{.When}}</td>
 </tr>
 {{end}}
