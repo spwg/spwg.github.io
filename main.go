@@ -39,6 +39,8 @@ var (
 	cloudflareIPv6Addresses string
 	//go:embed static/*
 	embeddedStatic embed.FS
+
+	databaseAddr = flag.String("database_addr", os.Getenv("DATABASE_URL"), "Connection string to the database.")
 )
 
 // installMiddleware sets up logging and recovery first so that the logging
@@ -107,7 +109,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 	glog.Infof("Connecting to the database.")
-	db, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
+	db, err := sql.Open("pgx", *databaseAddr)
 	if err != nil {
 		return err
 	}
@@ -131,6 +133,9 @@ func main() {
 	flag.Parse()
 	if err := flag.Set("alsologtostderr", "true"); err != nil {
 		glog.Fatal(err)
+	}
+	if *databaseAddr == "" {
+		glog.Exit("--database_addr is required")
 	}
 	if err := run(ctx); err != nil {
 		glog.Fatal(err)
