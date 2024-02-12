@@ -3,7 +3,7 @@ module github.com/spwg/personal-website
 go 1.22
 
 require (
-	github.com/getsentry/sentry-go v0.26.0
+	github.com/getsentry/sentry-go v0.27.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/unrolled/secure v1.14.0
