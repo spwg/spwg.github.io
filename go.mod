@@ -1,6 +1,6 @@
 module github.com/spwg/personal-website
 
-go 1.22
+go 1.21
 
 require (
 	github.com/getsentry/sentry-go v0.26.0
