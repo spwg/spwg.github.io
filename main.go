@@ -17,7 +17,6 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -41,6 +40,7 @@ var (
 	embeddedStatic embed.FS
 
 	databaseAddr = flag.String("database_addr", os.Getenv("DATABASE_URL"), "Connection string to the database.")
+	bindAddr     = flag.String("bind_addr", os.Getenv("BIND_ADDR"), "Full address to bind to.")
 )
 
 // installMiddleware sets up logging and recovery first so that the logging
@@ -90,18 +90,6 @@ func run(ctx context.Context) error {
 		}
 		defer sentry.Flush(2 * time.Second)
 	}
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	var host string
-	if os.Getenv("FLY_APP_NAME") != "" {
-		glog.Infof("Running in the fly.io runtime.")
-		gin.SetMode(gin.ReleaseMode)
-		host = "::"
-	} else {
-		host = "::1"
-	}
 	engine := gin.New()
 	installMiddleware(engine)
 	staticFS, err := fs.Sub(embeddedStatic, "static")
@@ -118,10 +106,10 @@ func run(ctx context.Context) error {
 	rowLimit := 100
 	_ = handlers.InstallRoutes(staticFS, engine, db, reloadLimit, rowLimit)
 	srv := &http.Server{
-		Addr:    net.JoinHostPort(host, port),
+		Addr:    *bindAddr,
 		Handler: engine,
 	}
-	glog.Infof("Listening on %v\n", net.JoinHostPort(host, port))
+	glog.Infof("Listening on %v\n", *bindAddr)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
