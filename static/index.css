@@ -1,0 +1,15 @@
+html {
+    max-width: 1024px;
+    white-space: normal;
+}
+
+@media (pointer: coarse) {
+    a {
+        padding: 10px;
+    }
+}
+
+#page-load-div {
+    display: none;
+    font-size: .8em;
+}
