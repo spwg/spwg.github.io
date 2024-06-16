@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -31,9 +32,29 @@ type FlightEntry struct {
 	WhenTime time.Time
 }
 
+// Connection is a database connection.
+type Connection struct {
+	db       *sql.DB
+	rowLimit int
+
+	lastReloadMu sync.Mutex
+	lastReload   time.Time
+
+	allFlightsMu sync.Mutex
+	allFlights   []*FlightEntry
+}
+
 // MostRecentFlights returns the most recent flights in the database according to the given row limit.
-func MostRecentFlights(ctx context.Context, db *sql.DB, rowLimit int) ([]*FlightEntry, error) {
-	rows, err := db.QueryContext(ctx, mostRecentFlightsQuery, rowLimit)
+func (c *Connection) MostRecentFlights(ctx context.Context) ([]*FlightEntry, error) {
+	c.allFlightsMu.Lock()
+	defer c.allFlightsMu.Unlock()
+	c.lastReloadMu.Lock()
+	defer c.lastReloadMu.Unlock()
+	if !c.lastReload.IsZero() && time.Since(c.lastReload) < time.Minute {
+		return c.allFlights, nil
+	}
+	c.lastReload = time.Now()
+	rows, err := c.db.QueryContext(ctx, mostRecentFlightsQuery, c.rowLimit)
 	if err != nil {
 		return nil, fmt.Errorf("loading most recent aircraft from fly postgres: query: %v", err)
 	}
@@ -58,6 +79,7 @@ func MostRecentFlights(ctx context.Context, db *sql.DB, rowLimit int) ([]*Flight
 		return nil, err
 	}
 	glog.Infof("Loaded most recent flights.")
+	c.allFlights = flights
 	return flights, nil
 }
 
@@ -67,4 +89,19 @@ func mustLoadLocation(name string) *time.Location {
 		panic(err)
 	}
 	return l
+}
+
+// Connect opens a new connection to the database at the given address.
+func Connect(addr string) (*Connection, error) {
+	glog.Infof("Connecting to the database.")
+	db, err := sql.Open("pgx", addr)
+	if err != nil {
+		return nil, err
+	}
+	glog.Infof("Connected to the database.")
+	conn := &Connection{
+		db:       db,
+		rowLimit: 100,
+	}
+	return conn, nil
 }

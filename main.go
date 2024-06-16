@@ -10,7 +10,6 @@
 package main
 
 import (
-	"database/sql"
 	"embed"
 	"errors"
 	"flag"
@@ -25,9 +24,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/spwg/personal-website/internal/database"
 	"github.com/spwg/personal-website/internal/handlers"
 	"github.com/unrolled/secure"
-	"golang.org/x/time/rate"
 )
 
 var (
@@ -104,15 +103,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	glog.Infof("Connecting to the database.")
-	db, err := sql.Open("pgx", *databaseAddr)
+	db, err := database.Connect(*databaseAddr)
 	if err != nil {
-		return err
+		return err 
 	}
-	glog.Infof("Connected to the database.")
-	reloadLimit := rate.NewLimiter(rate.Every(2*time.Minute), 1)
-	rowLimit := 100
-	_ = handlers.InstallRoutes(staticFS, engine, db, reloadLimit, rowLimit)
+	_ = handlers.InstallRoutes(staticFS, engine, db)
 	srv := &http.Server{
 		Addr:    *bindAddr,
 		Handler: engine,

@@ -3,44 +3,30 @@
 package handlers
 
 import (
-	"database/sql"
 	"html/template"
 	"io/fs"
 	"net/http"
 	"path"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 	"github.com/spwg/personal-website/internal/database"
-	"golang.org/x/time/rate"
 )
 
 // Server holds a collection of service endpoints.
 type Server struct {
 	static fs.FS
 	t      *template.Template
-
-	allFlightsMu sync.Mutex
-	allFlights   []*database.FlightEntry
-
-	db          *sql.DB
-	reloadLimit *rate.Limiter
-	queryLimit  int
+	db     *database.Connection
 }
 
 // aircraftFeed is the endpoint for aircraft data feed.
 func (s *Server) aircraftFeed(c *gin.Context) {
-	if s.reloadLimit.Reserve().OK() {
-		flights, err := database.MostRecentFlights(c.Request.Context(), s.db, s.queryLimit)
-		if err != nil {
-			glog.Error(err)
-		}
-		s.allFlightsMu.Lock()
-		s.allFlights = flights
-		defer s.allFlightsMu.Unlock()
+	flights, err := s.db.MostRecentFlights(c.Request.Context())
+	if err != nil {
+		glog.Error(err)
 	}
-	if err := s.t.Lookup("radar.tmpl").Execute(c.Writer, map[string]any{"Flights": s.allFlights}); err != nil {
+	if err := s.t.Lookup("radar.tmpl").Execute(c.Writer, map[string]any{"Flights": flights}); err != nil {
 		c.Error(err)
 		return
 	}
@@ -59,17 +45,15 @@ func (s *Server) css(c *gin.Context) {
 }
 
 // InstallRoutes registers the server's routes on the given [*gin.Engine].
-func InstallRoutes(static fs.FS, engine *gin.Engine, db *sql.DB, reloadLimit *rate.Limiter, limit int) *Server {
+func InstallRoutes(static fs.FS, engine *gin.Engine, db *database.Connection) *Server {
 	t, err := template.ParseFS(static, "*.tmpl")
 	if err != nil {
 		glog.Fatal(err)
 	}
 	s := &Server{
-		static:      static,
-		t:           t,
-		db:          db,
-		reloadLimit: reloadLimit,
-		queryLimit:  limit,
+		static: static,
+		t:      t,
+		db:     db,
 	}
 	engine.GET("/", s.root)
 	engine.GET("/js/:path", s.js)
