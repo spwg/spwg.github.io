@@ -10,7 +10,6 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"embed"
 	"errors"
@@ -77,7 +76,7 @@ func installMiddleware(r *gin.Engine) error {
 	return nil
 }
 
-func run(ctx context.Context) error {
+func run() error {
 	defer glog.Flush()
 	if os.Getenv("SENTRY_DSN") != "" {
 		glog.Infof("Initializing Sentry")
@@ -117,7 +116,6 @@ func run(ctx context.Context) error {
 }
 
 func main() {
-	ctx := context.Background()
 	flag.Parse()
 	if err := flag.Set("alsologtostderr", "true"); err != nil {
 		glog.Fatal(err)
@@ -125,7 +123,7 @@ func main() {
 	if *databaseAddr == "" {
 		glog.Exit("--database_addr is required")
 	}
-	if err := run(ctx); err != nil {
+	if err := run(); err != nil {
 		glog.Fatal(err)
 	}
 }
