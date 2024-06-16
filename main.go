@@ -76,19 +76,28 @@ func installMiddleware(r *gin.Engine) error {
 	return nil
 }
 
+func initializeSentry() (func(), error) {
+	if os.Getenv("SENTRY_DSN") == "" {
+		return func() {}, nil
+	}
+	glog.Infof("Initializing Sentry")
+	options := sentry.ClientOptions{
+		Dsn:              os.Getenv("SENTRY_DSN"),
+		TracesSampleRate: 1.0,
+	}
+	if err := sentry.Init(options); err != nil {
+		return func() {}, fmt.Errorf("sentry.Init: %v", err)
+	}
+	return func() { sentry.Flush(2 * time.Second) }, nil
+}
+
 func run() error {
 	defer glog.Flush()
-	if os.Getenv("SENTRY_DSN") != "" {
-		glog.Infof("Initializing Sentry")
-		options := sentry.ClientOptions{
-			Dsn:              os.Getenv("SENTRY_DSN"),
-			TracesSampleRate: 1.0,
-		}
-		if err := sentry.Init(options); err != nil {
-			return fmt.Errorf("sentry.Init: %v", err)
-		}
-		defer sentry.Flush(2 * time.Second)
+	flush, err := initializeSentry()
+	if err != nil {
+		return err
 	}
+	defer flush()
 	engine := gin.New()
 	installMiddleware(engine)
 	staticFS, err := fs.Sub(embeddedStatic, "static")
