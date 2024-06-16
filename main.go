@@ -109,7 +109,7 @@ func run(ctx context.Context) error {
 		Addr:    *bindAddr,
 		Handler: engine,
 	}
-	glog.Infof("Listening on %v\n", *bindAddr)
+	glog.Infof("Listening on %q\n", *bindAddr)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
