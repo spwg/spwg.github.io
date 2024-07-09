@@ -6,7 +6,7 @@ require (
 	github.com/getsentry/sentry-go v0.28.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/jackc/pgx/v4 v4.18.3
-	github.com/unrolled/secure v1.14.0
+	github.com/unrolled/secure v1.15.0
 )
 
 require (
