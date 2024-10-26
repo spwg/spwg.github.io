@@ -36,8 +36,15 @@ var (
 	//go:embed static/*
 	embeddedStatic embed.FS
 
-	bindAddr = flag.String("bind_addr", os.Getenv("BIND_ADDR"), "Full address to bind to.")
+	bindAddr = flag.String("bind_addr", defaultBindAddr(), "Full address to bind to.")
 )
+
+func defaultBindAddr() string {
+	if os.Getenv("BIND_ADDR") != "" {
+		return os.Getenv("BIND_ADDR")
+	}
+	return "localhost:8080"
+}
 
 // installMiddleware sets up logging and recovery first so that the logging
 // happens first and then recovery happens before any other middleware.
