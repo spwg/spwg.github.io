@@ -23,7 +23,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
-	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/spwg/personal-website/internal/handlers"
 	"github.com/unrolled/secure"
 )
