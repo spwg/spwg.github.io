@@ -10,8 +10,6 @@
 package main
 
 import (
-	"context"
-	"database/sql"
 	"embed"
 	"errors"
 	"flag"
@@ -28,7 +26,6 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/spwg/personal-website/internal/handlers"
 	"github.com/unrolled/secure"
-	"golang.org/x/time/rate"
 )
 
 var (
@@ -39,9 +36,15 @@ var (
 	//go:embed static/*
 	embeddedStatic embed.FS
 
-	databaseAddr = flag.String("database_addr", os.Getenv("DATABASE_URL"), "Connection string to the database.")
-	bindAddr     = flag.String("bind_addr", os.Getenv("BIND_ADDR"), "Full address to bind to.")
+	bindAddr = flag.String("bind_addr", defaultBindAddr(), "Full address to bind to.")
 )
+
+func defaultBindAddr() string {
+	if os.Getenv("BIND_ADDR") != "" {
+		return os.Getenv("BIND_ADDR")
+	}
+	return "localhost:8080"
+}
 
 // installMiddleware sets up logging and recovery first so that the logging
 // happens first and then recovery happens before any other middleware.
@@ -77,39 +80,40 @@ func installMiddleware(r *gin.Engine) error {
 	return nil
 }
 
-func run(ctx context.Context) error {
-	defer glog.Flush()
-	if os.Getenv("SENTRY_DSN") != "" {
-		glog.Infof("Initializing Sentry")
-		options := sentry.ClientOptions{
-			Dsn:              os.Getenv("SENTRY_DSN"),
-			TracesSampleRate: 1.0,
-		}
-		if err := sentry.Init(options); err != nil {
-			return fmt.Errorf("sentry.Init: %v", err)
-		}
-		defer sentry.Flush(2 * time.Second)
+func initializeSentry() (func(), error) {
+	if os.Getenv("SENTRY_DSN") == "" {
+		return func() {}, nil
 	}
+	glog.Infof("Initializing Sentry")
+	options := sentry.ClientOptions{
+		Dsn:              os.Getenv("SENTRY_DSN"),
+		TracesSampleRate: 1.0,
+	}
+	if err := sentry.Init(options); err != nil {
+		return func() {}, fmt.Errorf("sentry.Init: %v", err)
+	}
+	return func() { sentry.Flush(2 * time.Second) }, nil
+}
+
+func run() error {
+	defer glog.Flush()
+	flush, err := initializeSentry()
+	if err != nil {
+		return err
+	}
+	defer flush()
 	engine := gin.New()
 	installMiddleware(engine)
 	staticFS, err := fs.Sub(embeddedStatic, "static")
 	if err != nil {
 		return err
 	}
-	glog.Infof("Connecting to the database.")
-	db, err := sql.Open("pgx", *databaseAddr)
-	if err != nil {
-		return err
-	}
-	glog.Infof("Connected to the database.")
-	reloadLimit := rate.NewLimiter(rate.Every(2*time.Minute), 1)
-	rowLimit := 100
-	_ = handlers.InstallRoutes(staticFS, engine, db, reloadLimit, rowLimit)
+	_ = handlers.InstallRoutes(staticFS, engine)
 	srv := &http.Server{
 		Addr:    *bindAddr,
 		Handler: engine,
 	}
-	glog.Infof("Listening on %v\n", *bindAddr)
+	glog.Infof("Listening on %q\n", *bindAddr)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
@@ -117,15 +121,11 @@ func run(ctx context.Context) error {
 }
 
 func main() {
-	ctx := context.Background()
 	flag.Parse()
 	if err := flag.Set("alsologtostderr", "true"); err != nil {
 		glog.Fatal(err)
 	}
-	if *databaseAddr == "" {
-		glog.Exit("--database_addr is required")
-	}
-	if err := run(ctx); err != nil {
+	if err := run(); err != nil {
 		glog.Fatal(err)
 	}
 }
