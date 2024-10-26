@@ -24,7 +24,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/spwg/personal-website/internal/database"
 	"github.com/spwg/personal-website/internal/handlers"
 	"github.com/unrolled/secure"
 )
@@ -37,8 +36,7 @@ var (
 	//go:embed static/*
 	embeddedStatic embed.FS
 
-	databaseAddr = flag.String("database_addr", os.Getenv("DATABASE_URL"), "Connection string to the database.")
-	bindAddr     = flag.String("bind_addr", os.Getenv("BIND_ADDR"), "Full address to bind to.")
+	bindAddr = flag.String("bind_addr", os.Getenv("BIND_ADDR"), "Full address to bind to.")
 )
 
 // installMiddleware sets up logging and recovery first so that the logging
@@ -103,11 +101,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	db, err := database.Connect(*databaseAddr)
-	if err != nil {
-		return err 
-	}
-	_ = handlers.InstallRoutes(staticFS, engine, db)
+	_ = handlers.InstallRoutes(staticFS, engine)
 	srv := &http.Server{
 		Addr:    *bindAddr,
 		Handler: engine,
@@ -123,9 +117,6 @@ func main() {
 	flag.Parse()
 	if err := flag.Set("alsologtostderr", "true"); err != nil {
 		glog.Fatal(err)
-	}
-	if *databaseAddr == "" {
-		glog.Exit("--database_addr is required")
 	}
 	if err := run(); err != nil {
 		glog.Fatal(err)
