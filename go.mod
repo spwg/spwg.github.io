@@ -5,7 +5,7 @@ go 1.22
 require (
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/gin-gonic/gin v1.10.0
-	github.com/unrolled/secure v1.16.0
+	github.com/unrolled/secure v1.17.0
 )
 
 require (
